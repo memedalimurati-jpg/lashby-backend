@@ -1,6 +1,7 @@
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import json
 
@@ -11,6 +12,14 @@ app = FastAPI(
     title="Lashby Backend",
     description="Backend for Lashby booking",
     version="1.0.0"
+)
+
+# ✅ CORS – KRITISK FOR booking.html
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # senere kan strammes inn
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -46,7 +55,7 @@ def booking_page():
     return booking_file.read_text(encoding="utf-8")
 
 # ─────────────────────────────────────────────
-# Get all bookings (used by desktop app)
+# Get all bookings (desktop app)
 # ─────────────────────────────────────────────
 @app.get("/bookings")
 def get_bookings():
@@ -54,7 +63,7 @@ def get_bookings():
         return json.load(f)
 
 # ─────────────────────────────────────────────
-# Create booking (called from booking.html)
+# Create booking (from booking.html)
 # ─────────────────────────────────────────────
 @app.post("/bookings")
 def create_booking(booking: dict):
