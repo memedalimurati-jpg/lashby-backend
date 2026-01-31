@@ -1,0 +1,156 @@
+﻿<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <title>Bekreft timen din</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f7f7f7;
+            padding: 40px;
+        }
+
+        form {
+            background: white;
+            padding: 25px;
+            max-width: 420px;
+            margin: auto;
+            border-radius: 10px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .locked {
+            background: #eee;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            font-weight: bold;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 22px;
+            background: black;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        #info {
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        #result {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <form id="bookingForm">
+        <h2>Bekreft timen din</h2>
+
+        <div id="info"></div>
+
+        <label>Navn</label>
+        <input type="text" id="name" required>
+
+        <label>Service</label>
+        <select id="service">
+            <option>Lash Lift</option>
+            <option>Classic Lashes</option>
+            <option>Volume Lashes</option>
+        </select>
+
+        <label>Dato</label>
+        <input type="date" id="date" class="locked" readonly>
+
+        <label>Starttid</label>
+        <input type="time" id="start" class="locked" readonly>
+
+        <label>Sluttid</label>
+        <input type="time" id="end" class="locked" readonly>
+
+        <button type="submit">Bekreft booking</button>
+
+        <div id="result"></div>
+    </form>
+
+    <script>
+        function getParam(name) {
+            return new URLSearchParams(window.location.search).get(name);
+        }
+
+        // Hent dato/tid fra linken
+        const date = getParam("date");
+        const start = getParam("start");
+        const end = getParam("end");
+
+        const info = document.getElementById("info");
+
+        if (!date || !start || !end) {
+            info.innerText = "❌ Denne booking-linken er ugyldig";
+            info.style.color = "red";
+            document.querySelector("button").disabled = true;
+        } else {
+            document.getElementById("date").value = date;
+            document.getElementById("start").value = start;
+            document.getElementById("end").value = end;
+
+            info.innerText = `📅 ${date} ⏰ ${start}–${end}`;
+        }
+
+        document.getElementById("bookingForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
+
+            const data = {
+                customer_name: document.getElementById("name").value,
+                service: document.getElementById("service").value,
+                booking_date: date,
+                start_time: start,
+                end_time: end
+            };
+
+            const result = document.getElementById("result");
+            result.innerText = "Sender booking...";
+
+            try {
+                const response = await fetch("http://127.0.0.1:8000/bookings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    result.innerText = "✅ Tiden er bekreftet! Vi sees 💕";
+                } else {
+                    const err = await response.json();
+                    result.innerText = "❌ " + err.detail;
+                }
+            } catch {
+                result.innerText = "❌ Serveren er ikke tilgjengelig";
+            }
+        });
+    </script>
+
+</body>
+</html>
