@@ -22,7 +22,7 @@ app.add_middleware(
 )
 
 # ────────────────────────────────────
-# Paths (RENDER-SIKKER)
+# Paths
 # ────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -32,11 +32,8 @@ BOOKINGS_FILE = DATA_DIR / "bookings.json"
 TOKENS_FILE = DATA_DIR / "tokens.json"
 
 # ────────────────────────────────────
-# Ensure directories
+# Ensure directories & files
 # ────────────────────────────────────
-if not STATIC_DIR.exists():
-    raise RuntimeError(f"STATIC directory missing: {STATIC_DIR}")
-
 DATA_DIR.mkdir(exist_ok=True)
 
 if not BOOKINGS_FILE.exists():
@@ -57,7 +54,7 @@ class Booking(BaseModel):
     token: str
 
 # ────────────────────────────────────
-# Static files
+# Static files (ENESTE kilde for offers)
 # ────────────────────────────────────
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -99,52 +96,33 @@ def booking_exists(date, start, end):
 def root():
     return {"status": "ok", "message": "Lashby backend kjører"}
 
-# Server booking-siden
+# Booking-side (HTML)
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page():
     file = STATIC_DIR / "booking.html"
     if not file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"booking.html ikke funnet ({file})"
-        )
+        raise HTTPException(status_code=404, detail="booking.html ikke funnet")
     return file.read_text(encoding="utf-8")
 
-# OFFERS SNAPSHOT (STABIL, INGEN 500)
-@app.get("/offers_snapshot")
-def offers_snapshot():
-    file = STATIC_DIR / "offers_snapshot.json"
-
-    if not file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"offers_snapshot.json ikke funnet ({file})"
-        )
-
-    try:
-        return json.loads(file.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"JSON parse error: {str(e)}"
-        )
-
-# Hent alle bookinger
+# Hent alle bookinger (admin / debug)
 @app.get("/bookings")
 def get_bookings():
     return load_bookings()
 
-# Motta booking
+# Motta booking fra kunde
 @app.post("/bookings")
 def create_booking(booking: Booking):
     tokens = load_tokens()
 
+    # Token må finnes
     if booking.token not in tokens:
         raise HTTPException(status_code=400, detail="Ugyldig booking-link")
 
+    # Token må ikke være brukt
     if tokens[booking.token] == "used":
         raise HTTPException(status_code=400, detail="Linken er allerede brukt")
 
+    # Tid må være ledig
     if booking_exists(
         booking.date,
         booking.start_time,
@@ -152,6 +130,7 @@ def create_booking(booking: Booking):
     ):
         raise HTTPException(status_code=400, detail="Tiden er allerede booket")
 
+    # Lagre booking
     bookings = load_bookings()
     bookings.append({
         "name": booking.name,
@@ -162,7 +141,8 @@ def create_booking(booking: Booking):
     })
     save_bookings(bookings)
 
+    # Marker token som brukt
     tokens[booking.token] = "used"
     save_tokens(tokens)
 
-    return {"success": True}
+    return {"success": True, "message": "Booking bekreftet"}
