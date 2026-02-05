@@ -1,0 +1,9 @@
+.vs/
+__pycache__/
+*.pyc
+data/bookings.json
+
+
+git add .gitignore
+git commit -m "Add gitignore"
+git push
