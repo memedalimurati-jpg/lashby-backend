@@ -80,7 +80,8 @@
         },
         {
             "id": "a3",
-            "name": "Vippekost"
+            "name": "Vippekost",
+            "price": 0
         }
     ]
 }
