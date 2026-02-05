@@ -1,4 +1,4 @@
-{
+ï»¿{
     "services": [
         {
             "id": "s1",
@@ -7,7 +7,7 @@
         },
         {
             "id": "s2",
-            "name": "Påfyll klassisk",
+            "name": "PÃ¥fyll klassisk",
             "price": 300
         },
         {
@@ -17,7 +17,7 @@
         },
         {
             "id": "s4",
-            "name": "Påfyll mix",
+            "name": "PÃ¥fyll mix",
             "price": 500
         },
         {
@@ -27,7 +27,7 @@
         },
         {
             "id": "s6",
-            "name": "Påfyll volume",
+            "name": "PÃ¥fyll volume",
             "price": 600
         },
         {
@@ -49,19 +49,19 @@
     "packages": [
         {
             "id": "p3",
-            "name": "Forming av bryn med extentions",
+            "name": "Forming av bryn med extensions",
             "price": 800
         },
         {
             "id": "p1770022833",
-            "name": "Brynslaminering + vippeløft",
+            "name": "Brynslaminering + vippelÃ¸ft",
             "original_price": 800,
             "discount": 0,
             "price": 800
         },
         {
             "id": "p1770023876",
-            "name": "Extentions + brynslaminering",
+            "name": "Extensions + brynslaminering",
             "original_price": 800,
             "discount": 15,
             "price": 680
