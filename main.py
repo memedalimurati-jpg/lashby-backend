@@ -19,10 +19,10 @@ app.add_middleware(
 )
 
 # ────────────────────────────────────
-# Paths (VIKTIG: statisk, ikke static)
+# Paths (VIKTIG: static,
 # ────────────────────────────────────
 BASE_DIR = Path(__file__).parent
-STATIC_DIR = BASE_DIR / "statisk"
+STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
 
 BOOKINGS_FILE = DATA_DIR / "bookings.json"
