@@ -19,10 +19,10 @@ app.add_middleware(
 )
 
 # ────────────────────────────────────
-# Paths
+# Paths (VIKTIG: statisk, ikke static)
 # ────────────────────────────────────
 BASE_DIR = Path(__file__).parent
-STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR = BASE_DIR / "statisk"
 DATA_DIR = BASE_DIR / "data"
 
 BOOKINGS_FILE = DATA_DIR / "bookings.json"
@@ -95,7 +95,7 @@ def root():
 def booking_page():
     return (STATIC_DIR / "booking_v2.html").read_text(encoding="utf-8")
 
-# ✅ RIKTIG ROUTE: OFFERS SNAPSHOT
+# ✅ OFFERS SNAPSHOT (KRITISK ROUTE)
 @app.get("/offers_snapshot")
 def get_offers_snapshot():
     offers_file = STATIC_DIR / "offers_snapshot.json"
