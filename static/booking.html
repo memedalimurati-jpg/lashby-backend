@@ -86,8 +86,8 @@
         }
     </style>
 </head>
-<body>
 
+<body>
     <div class="card">
 
         <h1>Bekreft timen din</h1>
@@ -105,7 +105,7 @@
 
             <label>Tillegg (valgfritt)</label>
             <select id="addon">
-                <option value="" data-price="0">Ingen tillegg</option>
+                <option value="">Ingen tillegg</option>
             </select>
 
             <div class="price" id="total">Totalpris: 0 kr</div>
@@ -136,7 +136,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const nameInput = document.getElementById("name");
     const serviceSel = document.getElementById("service");
     const addonSel = document.getElementById("addon");
-    const totalEl = document.getElementById("total");
+    const total = document.getElementById("total");
     const confirmBtn = document.getElementById("confirmBtn");
     const result = document.getElementById("result");
 
@@ -147,47 +147,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     info.textContent = `📅 ${date}  ⏰ ${start} – ${end}`;
-    document.getElementById("date").value = date;
-    document.getElementById("start").value = start;
-    document.getElementById("end").value = end;
+    date && (document.getElementById("date").value = date);
+    start && (document.getElementById("start").value = start);
+    end && (document.getElementById("end").value = end);
 
-    let offers;
+    let data;
     try {
-        const res = await fetch("/static/offers_snapshot.json");
-        offers = await res.json();
+        const res = await fetch("/offers_snapshot?v=" + Date.now());
+        data = await res.json();
     } catch {
         info.textContent = "❌ Kunne ikke laste behandlinger";
         info.style.color = "red";
         return;
     }
 
-    /* Behandlinger */
-    if (Array.isArray(offers.services)) {
-        offers.services.forEach(s => {
-            const opt = document.createElement("option");
-            opt.value = s.id;
-            opt.dataset.price = s.price;
-            opt.textContent = `${s.name} – ${s.price} kr`;
-            serviceSel.appendChild(opt);
-        });
-    }
+    // -------- BEHANDLINGER --------
+    (data.services || []).forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.dataset.price = s.price || 0;
+        opt.textContent = `${s.name} – ${s.price || 0} kr`;
+        serviceSel.appendChild(opt);
+    });
 
-    /* Tillegg */
-    if (Array.isArray(offers.tillegg)) {
-        offers.tillegg.forEach(t => {
-            const opt = document.createElement("option");
-            opt.value = t.id;
-            opt.dataset.price = t.pris;
-            opt.textContent = `${t.navn} – ${t.pris} kr`;
-            addonSel.appendChild(opt);
-        });
-    }
+    // -------- TILLEGG (ROBUST) --------
+    const addons =
+        data.addons ||
+        data.tillegg ||
+        data.extras ||
+        [];
+
+    addons.forEach(a => {
+        const price = Number(a.price || 0);
+        const opt = document.createElement("option");
+        opt.value = a.id;
+        opt.dataset.price = price;
+        opt.textContent = price > 0
+            ? `${a.name} – ${price} kr`
+            : a.name;
+        addonSel.appendChild(opt);
+    });
 
     function updateForm() {
         const servicePrice = Number(serviceSel.selectedOptions[0]?.dataset.price || 0);
         const addonPrice = Number(addonSel.selectedOptions[0]?.dataset.price || 0);
 
-        totalEl.textContent = `Totalpris: ${servicePrice + addonPrice} kr`;
+        total.textContent = `Totalpris: ${servicePrice + addonPrice} kr`;
 
         confirmBtn.disabled =
             nameInput.value.trim() === "" ||
@@ -201,13 +206,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("bookingForm").addEventListener("submit", e => {
         e.preventDefault();
         if (confirmBtn.disabled) return;
-
         result.textContent = "✅ Takk! Timen er bekreftet 💕";
-        confirmBtn.disabled = true;
     });
-
 });
     </script>
-
 </body>
 </html>
