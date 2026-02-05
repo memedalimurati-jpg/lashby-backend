@@ -1,8 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 from pathlib import Path
 import json
 
@@ -11,9 +10,6 @@ import json
 # ────────────────────────────────────
 app = FastAPI(title="Lashby Backend")
 
-# ────────────────────────────────────
-# CORS
-# ────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,16 +20,14 @@ app.add_middleware(
 # ────────────────────────────────────
 # Paths
 # ────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
 
+OFFERS_FILE = STATIC_DIR / "offers_snapshot.json"
 BOOKINGS_FILE = DATA_DIR / "bookings.json"
 TOKENS_FILE = DATA_DIR / "tokens.json"
 
-# ────────────────────────────────────
-# Ensure directories & files
-# ────────────────────────────────────
 DATA_DIR.mkdir(exist_ok=True)
 
 if not BOOKINGS_FILE.exists():
@@ -43,26 +37,24 @@ if not TOKENS_FILE.exists():
     TOKENS_FILE.write_text("{}", encoding="utf-8")
 
 # ────────────────────────────────────
-# Models
-# ────────────────────────────────────
-class Booking(BaseModel):
-    name: str
-    service: str
-    date: str
-    start_time: str
-    end_time: str
-    token: str
-
-# ────────────────────────────────────
-# Static files (ENESTE kilde for offers)
+# Static files
 # ────────────────────────────────────
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ────────────────────────────────────
 # Helpers
 # ────────────────────────────────────
+def load_json(path: Path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"JSON parse error: {str(e)}"
+        )
+
 def load_bookings():
-    return json.loads(BOOKINGS_FILE.read_text(encoding="utf-8"))
+    return load_json(BOOKINGS_FILE)
 
 def save_bookings(data):
     BOOKINGS_FILE.write_text(
@@ -71,7 +63,7 @@ def save_bookings(data):
     )
 
 def load_tokens():
-    return json.loads(TOKENS_FILE.read_text(encoding="utf-8"))
+    return load_json(TOKENS_FILE)
 
 def save_tokens(data):
     TOKENS_FILE.write_text(
@@ -82,9 +74,9 @@ def save_tokens(data):
 def booking_exists(date, start, end):
     for b in load_bookings():
         if (
-            b["date"] == date
-            and b["start_time"] == start
-            and b["end_time"] == end
+            b["date"] == date and
+            b["start_time"] == start and
+            b["end_time"] == end
         ):
             return True
     return False
@@ -96,7 +88,7 @@ def booking_exists(date, start, end):
 def root():
     return {"status": "ok", "message": "Lashby backend kjører"}
 
-# Booking-side (HTML)
+# Booking side
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page():
     file = STATIC_DIR / "booking.html"
@@ -104,45 +96,55 @@ def booking_page():
         raise HTTPException(status_code=404, detail="booking.html ikke funnet")
     return file.read_text(encoding="utf-8")
 
-# Hent alle bookinger (admin / debug)
+# ✅ OFFERS SNAPSHOT – DENNE ER KRITISK
+@app.get("/offers_snapshot")
+def offers_snapshot():
+    if not OFFERS_FILE.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="offers_snapshot.json ikke funnet"
+        )
+    return JSONResponse(load_json(OFFERS_FILE))
+
+# Hent bookinger (debug/admin)
 @app.get("/bookings")
 def get_bookings():
     return load_bookings()
 
-# Motta booking fra kunde
+# Motta booking
 @app.post("/bookings")
-def create_booking(booking: Booking):
+def create_booking(payload: dict):
+    required = ["name", "service", "date", "start_time", "end_time", "token"]
+    for r in required:
+        if r not in payload:
+            raise HTTPException(status_code=400, detail=f"Mangler felt: {r}")
+
     tokens = load_tokens()
 
-    # Token må finnes
-    if booking.token not in tokens:
+    if payload["token"] not in tokens:
         raise HTTPException(status_code=400, detail="Ugyldig booking-link")
 
-    # Token må ikke være brukt
-    if tokens[booking.token] == "used":
-        raise HTTPException(status_code=400, detail="Linken er allerede brukt")
+    if tokens[payload["token"]] == "used":
+        raise HTTPException(status_code=400, detail="Link allerede brukt")
 
-    # Tid må være ledig
     if booking_exists(
-        booking.date,
-        booking.start_time,
-        booking.end_time
+        payload["date"],
+        payload["start_time"],
+        payload["end_time"]
     ):
         raise HTTPException(status_code=400, detail="Tiden er allerede booket")
 
-    # Lagre booking
     bookings = load_bookings()
     bookings.append({
-        "name": booking.name,
-        "service": booking.service,
-        "date": booking.date,
-        "start_time": booking.start_time,
-        "end_time": booking.end_time
+        "name": payload["name"],
+        "service": payload["service"],
+        "date": payload["date"],
+        "start_time": payload["start_time"],
+        "end_time": payload["end_time"]
     })
     save_bookings(bookings)
 
-    # Marker token som brukt
-    tokens[booking.token] = "used"
+    tokens[payload["token"]] = "used"
     save_tokens(tokens)
 
     return {"success": True, "message": "Booking bekreftet"}
