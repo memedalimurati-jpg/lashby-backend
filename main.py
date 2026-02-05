@@ -6,6 +6,9 @@ from pydantic import BaseModel
 from pathlib import Path
 import json
 
+# ────────────────────────────────────
+# App
+# ────────────────────────────────────
 app = FastAPI(title="Lashby Backend")
 
 # ────────────────────────────────────
@@ -19,14 +22,20 @@ app.add_middleware(
 )
 
 # ────────────────────────────────────
-# Paths (VIKTIG: static,
+# Paths (RENDER-SIKKER)
 # ────────────────────────────────────
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
 
 BOOKINGS_FILE = DATA_DIR / "bookings.json"
 TOKENS_FILE = DATA_DIR / "tokens.json"
+
+# ────────────────────────────────────
+# Ensure directories
+# ────────────────────────────────────
+if not STATIC_DIR.exists():
+    raise RuntimeError(f"STATIC directory missing: {STATIC_DIR}")
 
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -93,40 +102,49 @@ def root():
 # Server booking-siden
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page():
-    return (STATIC_DIR / "booking_v2.html").read_text(encoding="utf-8")
-
-# ✅ OFFERS SNAPSHOT (KRITISK ROUTE)
-@app.get("/offers_snapshot")
-def get_offers_snapshot():
-    offers_file = STATIC_DIR / "offers_snapshot.json"
-
-    if not offers_file.exists():
+    file = STATIC_DIR / "booking.html"
+    if not file.exists():
         raise HTTPException(
             status_code=404,
-            detail="offers_snapshot.json ikke funnet"
+            detail=f"booking.html ikke funnet ({file})"
+        )
+    return file.read_text(encoding="utf-8")
+
+# OFFERS SNAPSHOT (STABIL, INGEN 500)
+@app.get("/offers_snapshot")
+def offers_snapshot():
+    file = STATIC_DIR / "offers_snapshot.json"
+
+    if not file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"offers_snapshot.json ikke funnet ({file})"
         )
 
-    return json.loads(offers_file.read_text(encoding="utf-8"))
+    try:
+        return json.loads(file.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"JSON parse error: {str(e)}"
+        )
 
-# Hent alle bookinger (admin / debug)
+# Hent alle bookinger
 @app.get("/bookings")
 def get_bookings():
     return load_bookings()
 
-# Motta booking fra kunde
+# Motta booking
 @app.post("/bookings")
 def create_booking(booking: Booking):
     tokens = load_tokens()
 
-    # 1️⃣ Token må finnes
     if booking.token not in tokens:
         raise HTTPException(status_code=400, detail="Ugyldig booking-link")
 
-    # 2️⃣ Token må ikke være brukt
     if tokens[booking.token] == "used":
-        raise HTTPException(status_code=400, detail="Denne linken er allerede brukt")
+        raise HTTPException(status_code=400, detail="Linken er allerede brukt")
 
-    # 3️⃣ Tid må være ledig
     if booking_exists(
         booking.date,
         booking.start_time,
@@ -134,7 +152,6 @@ def create_booking(booking: Booking):
     ):
         raise HTTPException(status_code=400, detail="Tiden er allerede booket")
 
-    # 4️⃣ Lagre booking
     bookings = load_bookings()
     bookings.append({
         "name": booking.name,
@@ -145,11 +162,7 @@ def create_booking(booking: Booking):
     })
     save_bookings(bookings)
 
-    # 5️⃣ Marker token som brukt
     tokens[booking.token] = "used"
     save_tokens(tokens)
 
-    return {
-        "success": True,
-        "message": "Booking bekreftet"
-    }
+    return {"success": True}
