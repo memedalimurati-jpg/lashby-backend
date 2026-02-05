@@ -71,12 +71,10 @@
             border-radius: 10px;
             background: #d28fa0;
             color: white;
-            cursor: pointer;
         }
 
             button:disabled {
                 background: #aaa;
-                cursor: not-allowed;
             }
 
         #result {
@@ -117,98 +115,88 @@
                 <input id="end" readonly>
             </div>
 
-            <button type="submit" id="confirmBtn" disabled>Bekreft booking</button>
+            <button id="confirmBtn" disabled>Bekreft booking</button>
             <div id="result"></div>
 
         </form>
     </div>
 
     <script>
-document.addEventListener("DOMContentLoaded", async () => {
+(async () => {
 
-    const params = new URLSearchParams(window.location.search);
-    const date  = params.get("date");
-    const start = params.get("start");
-    const end   = params.get("end");
-    const token = params.get("token");
+const params = new URLSearchParams(location.search);
+const date = params.get("date");
+const start = params.get("start");
+const end = params.get("end");
+const token = params.get("token");
 
-    const info = document.getElementById("info");
-    const nameInput = document.getElementById("name");
-    const serviceSel = document.getElementById("service");
-    const addonSel = document.getElementById("addon");
-    const total = document.getElementById("total");
-    const confirmBtn = document.getElementById("confirmBtn");
-    const result = document.getElementById("result");
+const info = document.getElementById("info");
+const serviceSel = document.getElementById("service");
+const addonSel = document.getElementById("addon");
+const nameInput = document.getElementById("name");
+const total = document.getElementById("total");
+const confirmBtn = document.getElementById("confirmBtn");
+const result = document.getElementById("result");
 
-    if (!date || !start || !end || !token) {
-        info.textContent = "❌ Denne booking-linken er ugyldig";
-        info.style.color = "red";
-        return;
-    }
+if (!date || !start || !end || !token) {
+    info.textContent = "❌ Ugyldig booking-link";
+    info.style.color = "red";
+    return;
+}
 
-    info.textContent = `📅 ${date}  ⏰ ${start} – ${end}`;
-    date && (document.getElementById("date").value = date);
-    start && (document.getElementById("start").value = start);
-    end && (document.getElementById("end").value = end);
+info.textContent = `📅 ${date}  ⏰ ${start} – ${end}`;
+date && (document.getElementById("date").value = date);
+start && (document.getElementById("start").value = start);
+end && (document.getElementById("end").value = end);
 
-    let data;
-    try {
-        const res = await fetch("/offers_snapshot?v=" + Date.now());
-        data = await res.json();
-    } catch {
-        info.textContent = "❌ Kunne ikke laste behandlinger";
-        info.style.color = "red";
-        return;
-    }
+/* 🔥 HENTER DATA KUN FRA API 🔥 */
+let data;
+try {
+    const res = await fetch("/offers_snapshot");
+    data = await res.json();
+} catch {
+    info.textContent = "❌ Kunne ikke laste behandlinger";
+    info.style.color = "red";
+    return;
+}
 
-    // -------- BEHANDLINGER --------
-    (data.services || []).forEach(s => {
-        const opt = document.createElement("option");
-        opt.value = s.id;
-        opt.dataset.price = s.price || 0;
-        opt.textContent = `${s.name} – ${s.price || 0} kr`;
-        serviceSel.appendChild(opt);
-    });
-
-    // -------- TILLEGG (ROBUST) --------
-    const addons =
-        data.addons ||
-        data.tillegg ||
-        data.extras ||
-        [];
-
-    addons.forEach(a => {
-        const price = Number(a.price || 0);
-        const opt = document.createElement("option");
-        opt.value = a.id;
-        opt.dataset.price = price;
-        opt.textContent = price > 0
-            ? `${a.name} – ${price} kr`
-            : a.name;
-        addonSel.appendChild(opt);
-    });
-
-    function updateForm() {
-        const servicePrice = Number(serviceSel.selectedOptions[0]?.dataset.price || 0);
-        const addonPrice = Number(addonSel.selectedOptions[0]?.dataset.price || 0);
-
-        total.textContent = `Totalpris: ${servicePrice + addonPrice} kr`;
-
-        confirmBtn.disabled =
-            nameInput.value.trim() === "" ||
-            serviceSel.value === "";
-    }
-
-    nameInput.addEventListener("input", updateForm);
-    serviceSel.addEventListener("change", updateForm);
-    addonSel.addEventListener("change", updateForm);
-
-    document.getElementById("bookingForm").addEventListener("submit", e => {
-        e.preventDefault();
-        if (confirmBtn.disabled) return;
-        result.textContent = "✅ Takk! Timen er bekreftet 💕";
-    });
+/* BEHANDLINGER */
+(data.services || []).forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.dataset.price = s.price || 0;
+    opt.textContent = `${s.name} – ${s.price || 0} kr`;
+    serviceSel.appendChild(opt);
 });
+
+/* TILLEGG */
+(data.addons || []).forEach(a => {
+    const price = Number(a.price || 0);
+    const opt = document.createElement("option");
+    opt.value = a.id;
+    opt.dataset.price = price;
+    opt.textContent = price > 0 ? `${a.name} – ${price} kr` : a.name;
+    addonSel.appendChild(opt);
+});
+
+function update() {
+    const s = Number(serviceSel.selectedOptions[0]?.dataset.price || 0);
+    const a = Number(addonSel.selectedOptions[0]?.dataset.price || 0);
+    total.textContent = `Totalpris: ${s + a} kr`;
+    confirmBtn.disabled = !nameInput.value.trim() || !serviceSel.value;
+}
+
+nameInput.oninput = update;
+serviceSel.onchange = update;
+addonSel.onchange = update;
+
+document.getElementById("bookingForm").onsubmit = e => {
+    e.preventDefault();
+    if (confirmBtn.disabled) return;
+    result.textContent = "✅ Takk! Timen er bekreftet 💕";
+};
+
+})();
     </script>
 </body>
 </html>
