@@ -101,7 +101,13 @@ def booking_page():
 # ────────────────────────────────────
 @app.get("/services")
 def services():
-    snapshot = json.loads(OFFERS_FILE.read_text(encoding="utf-8"))
+    try:
+        snapshot = json.loads(OFFERS_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        return {
+            "error": "Failed to parse offers_snapshot.json",
+            "details": str(e)
+        }
     result = []
 
     for s in snapshot.get("services", []):
