@@ -101,11 +101,8 @@ def booking_page():
 # ────────────────────────────────────
 @app.get("/services")
 def services():
-    raw = OFFERS_FILE.read_text(encoding="utf-8")
-    return {
-        "raw_length": len(raw),
-        "raw_start": raw[:200]
-    }
+    snapshot = json.loads(OFFERS_FILE.read_text(encoding="utf-8"))
+    result = []
 
     for s in snapshot.get("services", []):
         result.append({
