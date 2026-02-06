@@ -7,28 +7,53 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background: #f6c9d3;
+            background: #f3c6d0;
             padding: 40px;
+            color: #111;
         }
 
-        .card {
+        form {
             background: #fdecef;
-            max-width: 460px;
+            padding: 28px;
+            max-width: 420px;
             margin: auto;
             border-radius: 18px;
-            padding: 28px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 26px rgba(0,0,0,0.18);
         }
 
-        h1 {
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+            .header img {
+                height: 46px;
+                display: block;
+            }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: bold;
             text-align: center;
-            margin-bottom: 6px;
+        }
+
+        .header-sub {
+            font-size: 12px;
+            color: #666;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
         }
 
         #info {
             text-align: center;
-            font-size: 14px;
             margin-bottom: 16px;
+            font-size: 14px;
         }
 
         label {
@@ -39,42 +64,52 @@
 
         input, select {
             width: 100%;
-            padding: 10px;
+            padding: 11px;
             margin-top: 6px;
             font-size: 14px;
-            border-radius: 8px;
-            border: 1px solid #e39aaa;
+            border-radius: 10px;
+            border: 1px solid #d9a4af;
+            background: #fff;
         }
 
             input[readonly] {
-                background: #f3d7dd;
+                background: #f0d6db;
             }
 
-        .row {
+        .datetime-row {
             display: flex;
             gap: 8px;
             margin-top: 6px;
         }
 
-        .price {
+            .datetime-row input {
+                flex: 1;
+                text-align: center;
+            }
+
+        #price {
             margin-top: 14px;
+            font-size: 15px;
             text-align: right;
             font-weight: bold;
+            min-height: 18px;
         }
 
         button {
-            width: 100%;
-            margin-top: 22px;
-            padding: 12px;
-            font-size: 15px;
-            border: none;
-            border-radius: 10px;
-            background: #d28fa0;
+            margin-top: 24px;
+            background: #e07b91;
             color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 14px;
+            font-size: 15px;
+            padding: 14px;
+            width: 100%;
         }
 
             button:disabled {
-                background: #aaa;
+                background: #cfa0aa;
+                cursor: not-allowed;
             }
 
         #result {
@@ -84,119 +119,157 @@
         }
     </style>
 </head>
-
 <body>
-    <div class="card">
 
-        <h1>Bekreft timen din</h1>
+    <form id="bookingForm">
+
+        <div class="header">
+            <img src="logo.png"
+                 alt="Lashby Emira"
+                 onerror="this.onerror=null;this.src='/static/logo.png';">
+            <div class="header-title">
+                Lashby Emira<br>
+                <span class="header-sub">siden 2014</span>
+            </div>
+        </div>
+
+        <h2>Bekreft timen din</h2>
         <div id="info"></div>
 
-        <form id="bookingForm">
+        <label>Navn</label>
+        <input type="text" id="name" required>
 
-            <label>Navn</label>
-            <input type="text" id="name">
+        <label>Behandling / Pakke</label>
+        <select id="mainService">
+            <option value="">Ingen behandlinger</option>
+        </select>
 
-            <label>Behandling / Pakke</label>
-            <select id="service">
-                <option value="">Velg behandling</option>
-            </select>
+        <label>Tillegg (valgfritt)</label>
+        <select id="addonService">
+            <option value="">Ingen tillegg</option>
+        </select>
 
-            <label>Tillegg (valgfritt)</label>
-            <select id="addon">
-                <option value="">Ingen tillegg</option>
-            </select>
+        <div id="price">Totalpris: 0 kr</div>
 
-            <div class="price" id="total">Totalpris: 0 kr</div>
+        <label>Dato / Tid</label>
+        <div class="datetime-row">
+            <input type="text" id="date" readonly>
+            <input type="text" id="start" readonly>
+            <input type="text" id="end" readonly>
+        </div>
 
-            <label>Dato / Tid</label>
-            <div class="row">
-                <input id="date" readonly>
-                <input id="start" readonly>
-                <input id="end" readonly>
-            </div>
+        <button type="submit" disabled>Bekreft booking</button>
+        <div id="result"></div>
 
-            <button id="confirmBtn" disabled>Bekreft booking</button>
-            <div id="result"></div>
-
-        </form>
-    </div>
+    </form>
 
     <script>
-(async () => {
+        const params = new URLSearchParams(window.location.search);
 
-const params = new URLSearchParams(location.search);
-const date = params.get("date");
-const start = params.get("start");
-const end = params.get("end");
-const token = params.get("token");
+        const date = params.get("date");
+        const start = params.get("start");
+        const end = params.get("end");
 
-const info = document.getElementById("info");
-const serviceSel = document.getElementById("service");
-const addonSel = document.getElementById("addon");
-const nameInput = document.getElementById("name");
-const total = document.getElementById("total");
-const confirmBtn = document.getElementById("confirmBtn");
-const result = document.getElementById("result");
+        // 🔑 token: støtter både &token=UUID og &UUID
+        let token = params.get("token");
+        if (!token) {
+            const parts = window.location.search.split("&");
+            const last = parts[parts.length - 1];
+            if (last && !last.includes("=")) {
+                token = last;
+            }
+        }
 
-if (!date || !start || !end || !token) {
-    info.textContent = "❌ Ugyldig booking-link";
-    info.style.color = "red";
-    return;
-}
+        const info = document.getElementById("info");
+        const button = document.querySelector("button");
+        const price = document.getElementById("price");
 
-info.textContent = `📅 ${date}  ⏰ ${start} – ${end}`;
-date && (document.getElementById("date").value = date);
-start && (document.getElementById("start").value = start);
-end && (document.getElementById("end").value = end);
+        const mainSelect = document.getElementById("mainService");
+        const addonSelect = document.getElementById("addonService");
 
-/* 🔥 HENTER DATA KUN FRA API 🔥 */
-let data;
-try {
-    const res = await fetch("/offers_snapshot");
-    data = await res.json();
-} catch {
-    info.textContent = "❌ Kunne ikke laste behandlinger";
-    info.style.color = "red";
-    return;
-}
+        let servicesCache = [];
 
-/* BEHANDLINGER */
-(data.services || []).forEach(s => {
-    const opt = document.createElement("option");
-    opt.value = s.id;
-    opt.dataset.price = s.price || 0;
-    opt.textContent = `${s.name} – ${s.price || 0} kr`;
-    serviceSel.appendChild(opt);
-});
+        if (!date || !start || !end || !token) {
+            info.innerHTML = "❌ Denne booking-linken er ugyldig";
+            info.style.color = "red";
+        } else {
+            document.getElementById("date").value = date;
+            document.getElementById("start").value = start;
+            document.getElementById("end").value = end;
+            info.innerHTML = `📅 ${date} ⏰ ${start} – ${end}`;
+        }
 
-/* TILLEGG */
-(data.addons || []).forEach(a => {
-    const price = Number(a.price || 0);
-    const opt = document.createElement("option");
-    opt.value = a.id;
-    opt.dataset.price = price;
-    opt.textContent = price > 0 ? `${a.name} – ${price} kr` : a.name;
-    addonSel.appendChild(opt);
-});
+        async function loadServices() {
+            try {
+                const res = await fetch("https://lashby-backend.onrender.com/services");
+                servicesCache = await res.json();
 
-function update() {
-    const s = Number(serviceSel.selectedOptions[0]?.dataset.price || 0);
-    const a = Number(addonSel.selectedOptions[0]?.dataset.price || 0);
-    total.textContent = `Totalpris: ${s + a} kr`;
-    confirmBtn.disabled = !nameInput.value.trim() || !serviceSel.value;
-}
+                servicesCache.forEach(s => {
+                    const o = document.createElement("option");
+                    o.value = s.id;
+                    o.textContent = `${s.name} (${s.price} kr)`;
 
-nameInput.oninput = update;
-serviceSel.onchange = update;
-addonSel.onchange = update;
+                    if (s.category === "Tillegg") {
+                        addonSelect.appendChild(o);
+                    } else {
+                        mainSelect.appendChild(o);
+                    }
+                });
+            } catch (e) {
+                info.innerHTML = "❌ Klarte ikke å laste behandlinger";
+                info.style.color = "red";
+            }
+        }
+        loadServices();
 
-document.getElementById("bookingForm").onsubmit = e => {
-    e.preventDefault();
-    if (confirmBtn.disabled) return;
-    result.textContent = "✅ Takk! Timen er bekreftet 💕";
-};
+        function oppdaterPris() {
+            let total = 0;
+            const main = servicesCache.find(s => s.id === mainSelect.value);
+            const addon = servicesCache.find(s => s.id === addonSelect.value);
 
-})();
+            if (main) total += main.price;
+            if (addon) total += addon.price;
+
+            price.textContent = `Totalpris: ${total} kr`;
+            button.disabled = !main;
+        }
+
+        mainSelect.addEventListener("change", oppdaterPris);
+        addonSelect.addEventListener("change", oppdaterPris);
+
+        document.getElementById("bookingForm").addEventListener("submit", async e => {
+            e.preventDefault();
+
+            const main = servicesCache.find(s => s.id === mainSelect.value);
+            const addon = servicesCache.find(s => s.id === addonSelect.value);
+
+            const payload = {
+                name: document.getElementById("name").value,
+                service: mainSelect.value,
+                addon: addon ? addon.id : null,
+                total_price: (main?.price || 0) + (addon?.price || 0),
+                date: date,
+                start_time: start,
+                end_time: end,
+                token: token
+            };
+
+            const res = await fetch("https://lashby-backend.onrender.com/bookings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                document.getElementById("result").innerText = "✅ Booking bekreftet";
+                button.disabled = true;
+            } else {
+                document.getElementById("result").innerText = "❌ " + (data.detail || "Feil");
+            }
+        });
     </script>
+
 </body>
 </html>
