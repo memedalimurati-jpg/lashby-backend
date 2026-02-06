@@ -11,9 +11,6 @@ import json
 # ────────────────────────────────────
 app = FastAPI(title="Lashby Backend")
 
-# ────────────────────────────────────
-# CORS
-# ────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,9 +29,6 @@ OFFERS_FILE = STATIC_DIR / "offers_snapshot.json"
 BOOKINGS_FILE = DATA_DIR / "bookings.json"
 TOKENS_FILE = DATA_DIR / "tokens.json"
 
-# ────────────────────────────────────
-# Ensure folders & files
-# ────────────────────────────────────
 STATIC_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -58,7 +52,7 @@ class Booking(BaseModel):
     token: str
 
 # ────────────────────────────────────
-# Static files
+# Static
 # ────────────────────────────────────
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -66,8 +60,6 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Helpers
 # ────────────────────────────────────
 def load_json(path: Path, default):
-    if not path.exists():
-        return default
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
@@ -97,27 +89,21 @@ def booking_exists(date, start, end):
 def root():
     return {"status": "ok", "message": "Lashby backend kjører"}
 
-# ────────────────────────────────────
-# Booking HTML
-# ────────────────────────────────────
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page():
     file = STATIC_DIR / "booking.html"
     if not file.exists():
-        raise HTTPException(status_code=404, detail="booking.html ikke funnet")
+        raise HTTPException(404, "booking.html ikke funnet")
     return file.read_text(encoding="utf-8")
 
 # ────────────────────────────────────
-# SERVICES (robust adapter)
+# SERVICES (ENDLIG, ROBUST)
 # ────────────────────────────────────
 @app.get("/services")
 def services():
-    return {
-        "exists": OFFERS_FILE.exists(),
-        "path": str(OFFERS_FILE)
-    }
+    snapshot = load_json(OFFERS_FILE, {})
+    result = []
 
-    # Behandlinger
     for s in snapshot.get("services", []):
         result.append({
             "id": s.get("id"),
@@ -126,7 +112,6 @@ def services():
             "category": "Behandling"
         })
 
-    # Pakker
     for p in snapshot.get("packages", []):
         result.append({
             "id": p.get("id"),
@@ -135,7 +120,6 @@ def services():
             "category": "Pakke"
         })
 
-    # Tillegg
     for a in snapshot.get("addons", []):
         result.append({
             "id": a.get("id"),
@@ -147,7 +131,7 @@ def services():
     return result
 
 # ────────────────────────────────────
-# Register token (fra Emira Lashby)
+# Tokens
 # ────────────────────────────────────
 @app.post("/tokens/{token}")
 def register_token(token: str):
@@ -157,38 +141,26 @@ def register_token(token: str):
     return {"ok": True}
 
 # ────────────────────────────────────
-# Create booking
+# Booking
 # ────────────────────────────────────
 @app.post("/bookings")
-def create_booking(booking: Booking):
+def create_booking(b: Booking):
     tokens = load_json(TOKENS_FILE, {})
 
-    if booking.token not in tokens:
-        raise HTTPException(status_code=400, detail="Ugyldig booking-link")
+    if b.token not in tokens:
+        raise HTTPException(400, "Ugyldig link")
 
-    if tokens[booking.token] == "used":
-        raise HTTPException(status_code=400, detail="Linken er allerede brukt")
+    if tokens[b.token] == "used":
+        raise HTTPException(400, "Link allerede brukt")
 
-    if booking_exists(
-        booking.date,
-        booking.start_time,
-        booking.end_time
-    ):
-        raise HTTPException(status_code=400, detail="Tiden er allerede booket")
+    if booking_exists(b.date, b.start_time, b.end_time):
+        raise HTTPException(400, "Tiden er allerede booket")
 
     bookings = load_json(BOOKINGS_FILE, [])
-    bookings.append({
-        "name": booking.name,
-        "service": booking.service,
-        "addon": booking.addon,
-        "price": booking.total_price,
-        "date": booking.date,
-        "start_time": booking.start_time,
-        "end_time": booking.end_time
-    })
+    bookings.append(b.dict())
     save_json(BOOKINGS_FILE, bookings)
 
-    tokens[booking.token] = "used"
+    tokens[b.token] = "used"
     save_json(TOKENS_FILE, tokens)
 
-    return {"success": True, "message": "Booking bekreftet"}
+    return {"success": True}
