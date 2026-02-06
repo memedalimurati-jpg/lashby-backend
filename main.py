@@ -112,8 +112,10 @@ def booking_page():
 # ────────────────────────────────────
 @app.get("/services")
 def services():
-    snapshot = load_json(OFFERS_FILE, {})
-    result = []
+    return {
+        "exists": OFFERS_FILE.exists(),
+        "path": str(OFFERS_FILE)
+    }
 
     # Behandlinger
     for s in snapshot.get("services", []):
