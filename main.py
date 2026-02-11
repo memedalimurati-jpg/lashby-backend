@@ -98,8 +98,10 @@ def booking_exists(date, start, end):
 # ────────────────────────────────────
 @app.get("/services")
 def services():
-    snapshot = load_json(OFFERS_FILE, {})
-    return snapshot
+    import json
+    with open("static/offers_snapshot.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data
 
 
 @app.get("/booking", response_class=HTMLResponse)
