@@ -86,9 +86,41 @@ def booking_exists(date, start, end):
 # ────────────────────────────────────
 # Routes
 # ────────────────────────────────────
-@app.get("/")
-def root():
-    return {"status": "ok", "message": "Lashby backend kjører"}
+@app.get("/services")
+def services():
+    try:
+        with open(OFFERS_FILE, "r", encoding="utf-8") as f:
+            snapshot = json.load(f)
+    except Exception:
+        return []
+
+    result = []
+
+    for s in snapshot.get("services", []):
+        result.append({
+            "id": s.get("id"),
+            "name": s.get("name"),
+            "price": s.get("price", 0),
+            "category": "Behandling"
+        })
+
+    for p in snapshot.get("packages", []):
+        result.append({
+            "id": p.get("id"),
+            "name": p.get("name"),
+            "price": p.get("price", p.get("original_price", 0)),
+            "category": "Pakke"
+        })
+
+    for a in snapshot.get("addons", []):
+        result.append({
+            "id": a.get("id"),
+            "name": a.get("name"),
+            "price": a.get("price", 0),
+            "category": "Tillegg"
+        })
+
+    return result
 
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page(request: Request):
