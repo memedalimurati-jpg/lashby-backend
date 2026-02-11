@@ -1,4 +1,7 @@
-﻿from fastapi import FastAPI, HTTPException, Request
+﻿
+print("### VERSION 999 ###")
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
