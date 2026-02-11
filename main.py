@@ -99,9 +99,13 @@ def booking_exists(date, start, end):
 @app.get("/services")
 def services():
     import json
-    with open("static/offers_snapshot.json", "r", encoding="utf-8") as f:
+    file_path = STATIC_DIR / "offers_snapshot.json"
+
+    with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
+
     return data
+
 
 
 @app.get("/booking", response_class=HTMLResponse)
