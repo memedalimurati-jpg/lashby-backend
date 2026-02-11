@@ -1,7 +1,4 @@
-﻿
-print("### VERSION 999 ###")
-
-from fastapi import FastAPI, HTTPException, Request
+﻿from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -93,7 +90,6 @@ def booking_exists(date, start, end):
 def root():
     return {"status": "ok", "message": "Lashby backend kjører"}
 
-# ✅ VALIDER TOKEN NÅR BOOKING-SIDEN ÅPNES
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page(request: Request):
 
@@ -117,17 +113,8 @@ def booking_page(request: Request):
 
     return file.read_text(encoding="utf-8")
 
-
-@app.get("/bookings")
-def get_bookings():
-    return load_json(BOOKINGS_FILE, [])
-
-
 @app.get("/services")
 def services():
-    print("OFFERS FILE PATH:", OFFERS_FILE)
-    print("EXISTS:", OFFERS_FILE.exists())
-    print("CONTENT:", OFFERS_FILE.read_text(encoding="utf-8"))
     snapshot = load_json(OFFERS_FILE, {})
     result = []
 
@@ -166,6 +153,18 @@ def register_token(token: str):
     tokens[token] = "free"
     save_json(TOKENS_FILE, tokens)
     return {"ok": True}
+
+@app.get("/tokens/{token}")
+def check_token(token: str):
+    tokens = load_json(TOKENS_FILE, {})
+
+    if token not in tokens:
+        raise HTTPException(400, "Ugyldig link")
+
+    if tokens[token] == "used":
+        raise HTTPException(400, "Link allerede brukt")
+
+    return {"status": "valid"}
 
 # ────────────────────────────────────
 # Booking
