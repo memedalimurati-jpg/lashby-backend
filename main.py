@@ -125,6 +125,9 @@ def get_bookings():
 
 @app.get("/services")
 def services():
+    print("OFFERS FILE PATH:", OFFERS_FILE)
+    print("EXISTS:", OFFERS_FILE.exists())
+    print("CONTENT:", OFFERS_FILE.read_text(encoding="utf-8"))
     snapshot = load_json(OFFERS_FILE, {})
     result = []
 
