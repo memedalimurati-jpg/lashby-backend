@@ -15,7 +15,7 @@
         form {
             background: #fdecef;
             padding: 28px;
-            max-width: 420px;
+            max-width: 480px;
             margin: auto;
             border-radius: 18px;
             box-shadow: 0 8px 26px rgba(0,0,0,0.18);
@@ -31,7 +31,6 @@
 
             .header img {
                 height: 46px;
-                display: block;
             }
 
         .header-title {
@@ -64,6 +63,7 @@
 
         input, select {
             width: 100%;
+            box-sizing: border-box;
             padding: 11px;
             margin-top: 6px;
             font-size: 14px;
@@ -76,6 +76,17 @@
                 background: #f0d6db;
             }
 
+        .row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .field {
+            flex: 1;
+        }
+        .row .field input {
+            width: 100%;
+        }
         .datetime-row {
             display: flex;
             gap: 8px;
@@ -92,7 +103,6 @@
             font-size: 15px;
             text-align: right;
             font-weight: bold;
-            min-height: 18px;
         }
 
         button {
@@ -125,7 +135,6 @@
 
         <div class="header">
             <img src="logo.png"
-                 alt="Lashby Emira"
                  onerror="this.onerror=null;this.src='/static/logo.png';">
             <div class="header-title">
                 Lashby Emira<br>
@@ -136,8 +145,16 @@
         <h2>Bekreft timen din</h2>
         <div id="info"></div>
 
-        <label>Navn</label>
-        <input type="text" id="name" required>
+        <div class="row">
+            <div class="field">
+                <label>Navn</label>
+                <input type="text" id="name" required>
+            </div>
+            <div class="field">
+                <label>Telefon</label>
+                <input type="text" id="phone" required>
+            </div>
+        </div>
 
         <label>Behandling / Pakke</label>
         <select id="mainService">
@@ -164,111 +181,150 @@
     </form>
 
     <script>
-        const params = new URLSearchParams(window.location.search);
+const params = new URLSearchParams(window.location.search);
 
-        const date = params.get("date");
-        const start = params.get("start");
-        const end = params.get("end");
+const date  = params.get("date");
+const start = params.get("start");
+const end   = params.get("end");
+const token = params.get("token");
 
-        // 🔑 token: støtter både &token=UUID og &UUID
-        let token = params.get("token");
-        if (!token) {
-            const parts = window.location.search.split("&");
-            const last = parts[parts.length - 1];
-            if (last && !last.includes("=")) {
-                token = last;
-            }
-        }
+const info   = document.getElementById("info");
+const button = document.querySelector("button");
+const price  = document.getElementById("price");
 
-        const info = document.getElementById("info");
-        const button = document.querySelector("button");
-        const price = document.getElementById("price");
+const mainSelect  = document.getElementById("mainService");
+const addonSelect = document.getElementById("addonService");
 
-        const mainSelect = document.getElementById("mainService");
-        const addonSelect = document.getElementById("addonService");
+let servicesCache = [];
 
-        let servicesCache = [];
+if (!date || !start || !end || !token) {
+    info.innerHTML = "❌ Denne booking-linken er ugyldig";
+    info.style.color = "red";
+    button.disabled = true;
+} else {
+    document.getElementById("date").value  = date;
+    document.getElementById("start").value = start;
+    document.getElementById("end").value   = end;
+    info.innerHTML = `📅 ${date} ⏰ ${start} – ${end}`;
+}
 
-        if (!date || !start || !end || !token) {
-            info.innerHTML = "❌ Denne booking-linken er ugyldig";
-            info.style.color = "red";
-        } else {
-            document.getElementById("date").value = date;
-            document.getElementById("start").value = start;
-            document.getElementById("end").value = end;
-            info.innerHTML = `📅 ${date} ⏰ ${start} – ${end}`;
-        }
+/* 🔐 VALIDATE TOKEN */
+async function validateToken() {
+    try {
+        const res = await fetch(
+            `https://lashby-backend.onrender.com/tokens/${token}`
+        );
+        if (!res.ok) throw new Error();
+    } catch {
+        info.innerHTML = "❌ Ugyldig eller brukt link";
+        info.style.color = "red";
+        button.disabled = true;
+    }
+}
 
-        async function loadServices() {
-            try {
-                const res = await fetch("https://lashby-backend.onrender.com/services");
-                servicesCache = await res.json();
+if (token) validateToken();
 
-                servicesCache.forEach(s => {
-                    const o = document.createElement("option");
-                    o.value = s.id;
-                    o.textContent = `${s.name} (${s.price} kr)`;
+/* LOAD SERVICES */
+async function loadServices() {
+    try {
+        const res = await fetch(
+            "https://lashby-backend.onrender.com/services"
+        );
+        servicesCache = await res.json();
 
-                    if (s.category === "Tillegg") {
-                        addonSelect.appendChild(o);
-                    } else {
-                        mainSelect.appendChild(o);
-                    }
-                });
-            } catch (e) {
-                info.innerHTML = "❌ Klarte ikke å laste behandlinger";
-                info.style.color = "red";
-            }
-        }
-        loadServices();
+        servicesCache.forEach(s => {
+            const o = document.createElement("option");
+            o.value = s.id;
+            o.textContent = `${s.name} (${s.price} kr)`;
+            if (s.category === "Tillegg")
+                addonSelect.appendChild(o);
+            else
+                mainSelect.appendChild(o);
+        });
+    } catch {
+        info.innerHTML = "❌ Klarte ikke å laste behandlinger";
+        info.style.color = "red";
+    }
+}
+loadServices();
 
-        function oppdaterPris() {
-            let total = 0;
-            const main = servicesCache.find(s => s.id === mainSelect.value);
-            const addon = servicesCache.find(s => s.id === addonSelect.value);
+/* PRICE UPDATE */
+function oppdaterPris() {
+    let total = 0;
+    const main  = servicesCache.find(s => s.id === mainSelect.value);
+    const addon = servicesCache.find(s => s.id === addonSelect.value);
 
-            if (main) total += main.price;
-            if (addon) total += addon.price;
+    if (main) total += main.price;
+    if (addon) total += addon.price;
 
-            price.textContent = `Totalpris: ${total} kr`;
-            button.disabled = !main;
-        }
+    price.textContent = `Totalpris: ${total} kr`;
+    button.disabled = !main;
+}
 
-        mainSelect.addEventListener("change", oppdaterPris);
-        addonSelect.addEventListener("change", oppdaterPris);
+mainSelect.addEventListener("change", oppdaterPris);
+addonSelect.addEventListener("change", oppdaterPris);
 
-        document.getElementById("bookingForm").addEventListener("submit", async e => {
-            e.preventDefault();
+/* SUBMIT */
+document.getElementById("bookingForm")
+.addEventListener("submit", async e => {
 
-            const main = servicesCache.find(s => s.id === mainSelect.value);
-            const addon = servicesCache.find(s => s.id === addonSelect.value);
+    e.preventDefault();
 
-            const payload = {
-                name: document.getElementById("name").value,
-                service: mainSelect.value,
-                addon: addon ? addon.id : null,
-                total_price: (main?.price || 0) + (addon?.price || 0),
-                date: date,
-                start_time: start,
-                end_time: end,
-                token: token
-            };
+    const name  = document.getElementById("name").value.trim();
+    const phone = document.getElementById("phone").value.trim();
 
-            const res = await fetch("https://lashby-backend.onrender.com/bookings", {
+    if (!/^\+?\d{8,15}$/.test(phone)) {
+        document.getElementById("result").innerText =
+            "❌ Ugyldig telefonnummer";
+        return;
+    }
+
+    const main  = servicesCache.find(s => s.id === mainSelect.value);
+    const addon = servicesCache.find(s => s.id === addonSelect.value);
+
+    if (!main) {
+        document.getElementById("result").innerText =
+            "❌ Velg behandling";
+        return;
+    }
+
+    const payload = {
+        name: name,
+        phone: phone,
+        service: mainSelect.value,
+        addon: addon ? addon.id : null,
+        total_price: (main?.price || 0) + (addon?.price || 0),
+        date: date,
+        start_time: start,
+        end_time: end,
+        token: token
+    };
+
+    try {
+        const res = await fetch(
+            "https://lashby-backend.onrender.com/bookings",
+            {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
-            });
-
-            const data = await res.json();
-
-            if (res.ok) {
-                document.getElementById("result").innerText = "✅ Booking bekreftet";
-                button.disabled = true;
-            } else {
-                document.getElementById("result").innerText = "❌ " + (data.detail || "Feil");
             }
-        });
+        );
+
+        const data = await res.json();
+
+        if (res.ok) {
+            document.getElementById("result").innerText =
+                "✅ Booking bekreftet";
+            button.disabled = true;
+        } else {
+            document.getElementById("result").innerText =
+                "❌ " + (data.detail || "Feil");
+        }
+    } catch {
+        document.getElementById("result").innerText =
+            "❌ Serverfeil";
+    }
+});
     </script>
 
 </body>

@@ -39,24 +39,6 @@ if not TOKENS_FILE.exists():
     TOKENS_FILE.write_text("{}", encoding="utf-8")
 
 # ────────────────────────────────────
-# Models
-# ────────────────────────────────────
-class Booking(BaseModel):
-    name: str
-    service: str
-    addon: str | None = None
-    total_price: int
-    date: str
-    start_time: str
-    end_time: str
-    token: str
-
-# ────────────────────────────────────
-# Static
-# ────────────────────────────────────
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-# ────────────────────────────────────
 # Helpers
 # ────────────────────────────────────
 def load_json(path: Path, default):
@@ -75,20 +57,42 @@ def booking_exists(date, start, end):
     bookings = load_json(BOOKINGS_FILE, [])
     for b in bookings:
         if (
-            b.get("date") == date
-            and b.get("start_time") == start
-            and b.get("end_time") == end
+            b.get("date") == date and
+            b.get("start_time") == start and
+            b.get("end_time") == end
         ):
             return True
     return False
 
 # ────────────────────────────────────
-# Routes
+# Models
+# ────────────────────────────────────
+class Booking(BaseModel):
+    name: str
+    phone: str
+    service: str
+    addon: str | None = None
+    total_price: int
+    date: str
+    start_time: str
+    end_time: str
+    token: str
+
+# ────────────────────────────────────
+# Static
+# ────────────────────────────────────
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# ────────────────────────────────────
+# Root
 # ────────────────────────────────────
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Lashby backend kjører"}
 
+# ────────────────────────────────────
+# Booking page
+# ────────────────────────────────────
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page():
     file = STATIC_DIR / "booking.html"
@@ -97,7 +101,7 @@ def booking_page():
     return file.read_text(encoding="utf-8")
 
 # ────────────────────────────────────
-# SERVICES (ENDLIG, ROBUST)
+# Services
 # ────────────────────────────────────
 @app.get("/services")
 def services():
@@ -110,6 +114,7 @@ def services():
             "error": "Failed to parse offers_snapshot.json",
             "details": str(e)
         }
+
     result = []
 
     for s in snapshot.get("services", []):
@@ -139,8 +144,10 @@ def services():
     return result
 
 # ────────────────────────────────────
-# Tokens
+# TOKENS
 # ────────────────────────────────────
+
+# 1️⃣ Desktop registrerer token
 @app.post("/tokens/{token}")
 def register_token(token: str):
     tokens = load_json(TOKENS_FILE, {})
@@ -148,19 +155,36 @@ def register_token(token: str):
     save_json(TOKENS_FILE, tokens)
     return {"ok": True}
 
+# 2️⃣ Booking-side validerer token
+@app.get("/tokens/{token}")
+def validate_token(token: str):
+    tokens = load_json(TOKENS_FILE, {})
+
+    if token not in tokens:
+        raise HTTPException(404, "Ugyldig link")
+
+    if tokens[token] == "used":
+        raise HTTPException(400, "Link allerede brukt")
+
+    return {"status": "valid"}
+
 # ────────────────────────────────────
-# Booking
+# Create booking
 # ────────────────────────────────────
 @app.post("/bookings")
 def create_booking(b: Booking):
+
     tokens = load_json(TOKENS_FILE, {})
 
+    # 🔐 token må eksistere
     if b.token not in tokens:
         raise HTTPException(400, "Ugyldig link")
 
-    if tokens[b.token] == "used":
+    # 🔐 token må være free
+    if tokens[b.token] != "free":
         raise HTTPException(400, "Link allerede brukt")
 
+    # 🔐 sjekk om tid allerede booket
     if booking_exists(b.date, b.start_time, b.end_time):
         raise HTTPException(400, "Tiden er allerede booket")
 
@@ -168,6 +192,7 @@ def create_booking(b: Booking):
     bookings.append(b.dict())
     save_json(BOOKINGS_FILE, bookings)
 
+    # 🔒 merk token som brukt
     tokens[b.token] = "used"
     save_json(TOKENS_FILE, tokens)
 
