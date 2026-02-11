@@ -1,16 +1,16 @@
-﻿print("I AM THE REAL MAIN FILE")
-
-from fastapi import FastAPI, HTTPException, Request
+﻿from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
 import json
+import uuid
 
-# ────────────────────────────────────
-# App
-# ────────────────────────────────────
+# --------------------------------------------------
+# APP
+# --------------------------------------------------
+
 app = FastAPI(title="Lashby Backend")
 
 app.add_middleware(
@@ -20,19 +20,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ────────────────────────────────────
-# Paths
-# ────────────────────────────────────
+print("I AM THE REAL MAIN FILE")
+
+# --------------------------------------------------
+# PATHS
+# --------------------------------------------------
+
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
 
+STATIC_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(exist_ok=True)
+
 OFFERS_FILE = STATIC_DIR / "offers_snapshot.json"
 BOOKINGS_FILE = DATA_DIR / "bookings.json"
 TOKENS_FILE = DATA_DIR / "tokens.json"
-
-STATIC_DIR.mkdir(exist_ok=True)
-DATA_DIR.mkdir(exist_ok=True)
 
 if not BOOKINGS_FILE.exists():
     BOOKINGS_FILE.write_text("[]", encoding="utf-8")
@@ -40,9 +43,10 @@ if not BOOKINGS_FILE.exists():
 if not TOKENS_FILE.exists():
     TOKENS_FILE.write_text("{}", encoding="utf-8")
 
-# ────────────────────────────────────
-# Models
-# ────────────────────────────────────
+# --------------------------------------------------
+# MODELS
+# --------------------------------------------------
+
 class Booking(BaseModel):
     name: str
     phone: str
@@ -54,27 +58,22 @@ class Booking(BaseModel):
     end_time: str
     token: str
 
-# ────────────────────────────────────
-# Static
-# ────────────────────────────────────
+# --------------------------------------------------
+# STATIC
+# --------------------------------------------------
+
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# ────────────────────────────────────
-# Helpers
-# ────────────────────────────────────
+# --------------------------------------------------
+# HELPERS
+# --------------------------------------------------
+
 def load_json(path: Path, default):
-    if not path.exists():
-        print("FILE NOT FOUND:", path)
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
         return default
 
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            print("LOADED OK:", path)
-            return data
-    except Exception as e:
-        print("JSON ERROR:", e)
-        return default
 
 def save_json(path: Path, data):
     path.write_text(
@@ -82,113 +81,70 @@ def save_json(path: Path, data):
         encoding="utf-8"
     )
 
-def booking_exists(date, start, end):
-    bookings = load_json(BOOKINGS_FILE, [])
-    for b in bookings:
-        if (
-            b.get("date") == date
-            and b.get("start_time") == start
-            and b.get("end_time") == end
-        ):
-            return True
-    return False
+# --------------------------------------------------
+# ROUTES
+# --------------------------------------------------
 
-# ────────────────────────────────────
-# Routes
-# ────────────────────────────────────
-@app.get("/services")
-def services():
-    import json
-    file_path = STATIC_DIR / "offers_snapshot.json"
-
-    with open(file_path, "r", encoding="utf-8-sig") as f:
-        data = json.load(f)
-
-    return data
-
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "Lashby backend kjører"}
 
 
 @app.get("/booking", response_class=HTMLResponse)
-def booking_page(request: Request):
-
-    token = request.query_params.get("token")
-
-    if not token:
-        raise HTTPException(400, "Mangler token")
-
-    tokens = load_json(TOKENS_FILE, {})
-
-    if token not in tokens:
-        raise HTTPException(400, "Ugyldig eller brukt link")
-
-    if tokens[token] == "used":
-        raise HTTPException(400, "Ugyldig eller brukt link")
-
+def booking_page():
     file = STATIC_DIR / "booking.html"
-
     if not file.exists():
         raise HTTPException(404, "booking.html ikke funnet")
-
     return file.read_text(encoding="utf-8")
+
 
 @app.get("/services")
 def services():
     snapshot = load_json(OFFERS_FILE, {})
-    result = []
+    return snapshot
 
-    for s in snapshot.get("services", []):
-        result.append({
-            "id": s.get("id"),
-            "name": s.get("name"),
-            "price": s.get("price", 0),
-            "category": "Behandling"
-        })
 
-    for p in snapshot.get("packages", []):
-        result.append({
-            "id": p.get("id"),
-            "name": p.get("name"),
-            "price": p.get("price", p.get("original_price", 0)),
-            "category": "Pakke"
-        })
+@app.get("/bookings")
+def get_bookings():
+    data = load_json(BOOKINGS_FILE, [])
+    print("RETURNING BOOKINGS:", data)
+    return data
 
-    for a in snapshot.get("addons", []):
-        result.append({
-            "id": a.get("id"),
-            "name": a.get("name"),
-            "price": a.get("price", 0),
-            "category": "Tillegg"
-        })
 
-    return result
+# --------------------------------------------------
+# TOKEN
+# --------------------------------------------------
 
-# ────────────────────────────────────
-# Tokens
-# ────────────────────────────────────
 @app.post("/tokens/{token}")
 def register_token(token: str):
     tokens = load_json(TOKENS_FILE, {})
     tokens[token] = "free"
     save_json(TOKENS_FILE, tokens)
+    print("TOKEN REGISTERED:", token)
     return {"ok": True}
 
+
 @app.get("/tokens/{token}")
-def check_token(token: str):
+def validate_token(token: str):
     tokens = load_json(TOKENS_FILE, {})
 
     if token not in tokens:
-        raise HTTPException(400, "Ugyldig link")
+        raise HTTPException(400, "Ugyldig eller brukt link")
 
     if tokens[token] == "used":
-        raise HTTPException(400, "Link allerede brukt")
+        raise HTTPException(400, "Ugyldig eller brukt link")
 
-    return {"status": "valid"}
+    return {"valid": True}
 
-# ────────────────────────────────────
-# Booking
-# ────────────────────────────────────
+
+# --------------------------------------------------
+# BOOKING
+# --------------------------------------------------
+
 @app.post("/bookings")
 def create_booking(b: Booking):
+
+    print("BOOKING RECEIVED:", b)
 
     tokens = load_json(TOKENS_FILE, {})
 
@@ -198,45 +154,25 @@ def create_booking(b: Booking):
     if tokens[b.token] == "used":
         raise HTTPException(400, "Link allerede brukt")
 
-    if booking_exists(b.date, b.start_time, b.end_time):
-        raise HTTPException(400, "Tiden er allerede booket")
-
     bookings = load_json(BOOKINGS_FILE, [])
-    snapshot = load_json(OFFERS_FILE, {})
 
-    service_name = ""
-    addon_name = None
-
-    for s in snapshot.get("services", []):
-        if s.get("id") == b.service:
-            service_name = s.get("name")
-            break
-
-    for p in snapshot.get("packages", []):
-        if p.get("id") == b.service:
-            service_name = p.get("name")
-            break
-
-    if b.addon:
-        for a in snapshot.get("addons", []):
-            if a.get("id") == b.addon:
-                addon_name = a.get("name")
-                break
-
-    bookings.append({
+    new_booking = {
+        "id": str(uuid.uuid4()),
         "name": b.name,
         "phone": b.phone,
         "service": b.service,
-        "service_name": service_name,
         "addon": b.addon,
-        "addon_name": addon_name,
         "total_price": b.total_price,
-        "date": b.date,
+        "date": b.date.strip(),
         "start_time": b.start_time,
         "end_time": b.end_time
-    })
+    }
 
+    bookings.append(new_booking)
+
+    print("SAVING TO:", BOOKINGS_FILE)
     save_json(BOOKINGS_FILE, bookings)
+    print("BOOKING SAVED")
 
     tokens[b.token] = "used"
     save_json(TOKENS_FILE, tokens)
