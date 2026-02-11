@@ -39,7 +39,7 @@ if not TOKENS_FILE.exists():
     TOKENS_FILE.write_text("{}", encoding="utf-8")
 
 # ────────────────────────────────────
-# Model
+# Models
 # ────────────────────────────────────
 class Booking(BaseModel):
     name: str
@@ -52,10 +52,12 @@ class Booking(BaseModel):
     end_time: str
     token: str
 
+
 # ────────────────────────────────────
-# Static mount
+# Static
 # ────────────────────────────────────
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
 # ────────────────────────────────────
 # Helpers
@@ -66,11 +68,13 @@ def load_json(path: Path, default):
     except Exception:
         return default
 
+
 def save_json(path: Path, data):
     path.write_text(
         json.dumps(data, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
+
 
 def booking_exists(date, start, end):
     bookings = load_json(BOOKINGS_FILE, [])
@@ -83,16 +87,15 @@ def booking_exists(date, start, end):
             return True
     return False
 
+
 # ────────────────────────────────────
-# ROOT
+# Routes
 # ────────────────────────────────────
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Lashby backend kjører"}
 
-# ────────────────────────────────────
-# Booking page
-# ────────────────────────────────────
+
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page():
     file = STATIC_DIR / "booking.html"
@@ -100,21 +103,15 @@ def booking_page():
         raise HTTPException(404, "booking.html ikke funnet")
     return file.read_text(encoding="utf-8")
 
-# ────────────────────────────────────
-# SERVICES
-# ────────────────────────────────────
+
+@app.get("/bookings")
+def get_bookings():
+    return load_json(BOOKINGS_FILE, [])
+
+
 @app.get("/services")
 def services():
-    try:
-        snapshot = json.loads(
-            OFFERS_FILE.read_text(encoding="utf-8-sig")
-        )
-    except Exception as e:
-        return {
-            "error": "Failed to parse offers_snapshot.json",
-            "details": str(e)
-        }
-
+    snapshot = load_json(OFFERS_FILE, {})
     result = []
 
     for s in snapshot.get("services", []):
@@ -143,8 +140,9 @@ def services():
 
     return result
 
+
 # ────────────────────────────────────
-# TOKENS
+# Tokens
 # ────────────────────────────────────
 @app.post("/tokens/{token}")
 def register_token(token: str):
@@ -153,22 +151,9 @@ def register_token(token: str):
     save_json(TOKENS_FILE, tokens)
     return {"ok": True}
 
-@app.get("/tokens/{token}")
-def check_token(token: str):
-    tokens = load_json(TOKENS_FILE, {})
-    if token not in tokens:
-        raise HTTPException(400, "Ugyldig link")
-    return {"status": tokens[token]}
 
 # ────────────────────────────────────
-# GET ALL BOOKINGS  🔥 VIKTIG
-# ────────────────────────────────────
-@app.get("/bookings")
-def get_bookings():
-    return load_json(BOOKINGS_FILE, [])
-
-# ────────────────────────────────────
-# CREATE BOOKING
+# Booking
 # ────────────────────────────────────
 @app.post("/bookings")
 def create_booking(b: Booking):
@@ -184,17 +169,36 @@ def create_booking(b: Booking):
     if booking_exists(b.date, b.start_time, b.end_time):
         raise HTTPException(400, "Tiden er allerede booket")
 
-    # Valider telefon
-    if not b.phone.isdigit() or not (8 <= len(b.phone) <= 15):
-        raise HTTPException(400, "Ugyldig telefonnummer")
-
     bookings = load_json(BOOKINGS_FILE, [])
+    snapshot = load_json(OFFERS_FILE, {})
+
+    # 🔍 Finn service navn
+    service_name = ""
+    addon_name = None
+
+    for s in snapshot.get("services", []):
+        if s.get("id") == b.service:
+            service_name = s.get("name")
+            break
+
+    for p in snapshot.get("packages", []):
+        if p.get("id") == b.service:
+            service_name = p.get("name")
+            break
+
+    if b.addon:
+        for a in snapshot.get("addons", []):
+            if a.get("id") == b.addon:
+                addon_name = a.get("name")
+                break
 
     bookings.append({
         "name": b.name,
         "phone": b.phone,
         "service": b.service,
+        "service_name": service_name,
         "addon": b.addon,
+        "addon_name": addon_name,
         "total_price": b.total_price,
         "date": b.date,
         "start_time": b.start_time,
