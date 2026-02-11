@@ -70,11 +70,10 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 def load_json(path: Path, default):
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception as e:
+        print("JSON ERROR:", e)
         return default
-
-
 def save_json(path: Path, data):
     path.write_text(
         json.dumps(data, ensure_ascii=False, indent=2),
