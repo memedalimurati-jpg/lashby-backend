@@ -61,9 +61,17 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Helpers
 # ────────────────────────────────────
 def load_json(path: Path, default):
+    if not path.exists():
+        print("FILE NOT FOUND:", path)
+        return default
+
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            print("LOADED OK:", path)
+            return data
+    except Exception as e:
+        print("JSON ERROR:", e)
         return default
 
 def save_json(path: Path, data):
