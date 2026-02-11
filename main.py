@@ -1,4 +1,6 @@
-﻿from fastapi import FastAPI, HTTPException, Request
+﻿print("I AM THE REAL MAIN FILE")
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
