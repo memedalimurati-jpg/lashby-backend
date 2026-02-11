@@ -6,7 +6,7 @@
 
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Arial,sans-serif;
             background: #f3c6d0;
             padding: 40px;
             color: #111;
@@ -84,9 +84,7 @@
         .field {
             flex: 1;
         }
-        .row .field input {
-            width: 100%;
-        }
+
         .datetime-row {
             display: flex;
             gap: 8px;
@@ -129,13 +127,13 @@
         }
     </style>
 </head>
+
 <body>
 
     <form id="bookingForm">
 
         <div class="header">
-            <img src="logo.png"
-                 onerror="this.onerror=null;this.src='/static/logo.png';">
+            <img src="logo.png" onerror="this.onerror=null;this.src='/static/logo.png';">
             <div class="header-title">
                 Lashby Emira<br>
                 <span class="header-sub">siden 2014</span>
@@ -182,7 +180,6 @@
 
     <script>
 const params = new URLSearchParams(window.location.search);
-
 const date  = params.get("date");
 const start = params.get("start");
 const end   = params.get("end");
@@ -191,7 +188,6 @@ const token = params.get("token");
 const info   = document.getElementById("info");
 const button = document.querySelector("button");
 const price  = document.getElementById("price");
-
 const mainSelect  = document.getElementById("mainService");
 const addonSelect = document.getElementById("addonService");
 
@@ -208,12 +204,10 @@ if (!date || !start || !end || !token) {
     info.innerHTML = `📅 ${date} ⏰ ${start} – ${end}`;
 }
 
-/* 🔐 VALIDATE TOKEN */
+/* TOKEN VALIDATION */
 async function validateToken() {
     try {
-        const res = await fetch(
-            `https://lashby-backend.onrender.com/tokens/${token}`
-        );
+        const res = await fetch(`/tokens/${token}`);
         if (!res.ok) throw new Error();
     } catch {
         info.innerHTML = "❌ Ugyldig eller brukt link";
@@ -221,16 +215,27 @@ async function validateToken() {
         button.disabled = true;
     }
 }
-
 if (token) validateToken();
 
 /* LOAD SERVICES */
 async function loadServices() {
     try {
-        const res = await fetch(
-            "https://lashby-backend.onrender.com/services"
-        );
-        servicesCache = await res.json();
+        const res = await fetch("/services");
+        const data = await res.json();
+
+        servicesCache = [];
+
+        data.services.forEach(s => {
+            servicesCache.push({id:s.id,name:s.name,price:s.price,category:"Behandling"});
+        });
+
+        data.packages.forEach(p => {
+            servicesCache.push({id:p.id,name:p.name,price:p.price,category:"Pakke"});
+        });
+
+        data.addons.forEach(a => {
+            servicesCache.push({id:a.id,name:a.name,price:a.price,category:"Tillegg"});
+        });
 
         servicesCache.forEach(s => {
             const o = document.createElement("option");
@@ -241,6 +246,7 @@ async function loadServices() {
             else
                 mainSelect.appendChild(o);
         });
+
     } catch {
         info.innerHTML = "❌ Klarte ikke å laste behandlinger";
         info.style.color = "red";
@@ -260,22 +266,18 @@ function oppdaterPris() {
     price.textContent = `Totalpris: ${total} kr`;
     button.disabled = !main;
 }
-
 mainSelect.addEventListener("change", oppdaterPris);
 addonSelect.addEventListener("change", oppdaterPris);
 
 /* SUBMIT */
-document.getElementById("bookingForm")
-.addEventListener("submit", async e => {
-
+document.getElementById("bookingForm").addEventListener("submit", async e => {
     e.preventDefault();
 
     const name  = document.getElementById("name").value.trim();
     const phone = document.getElementById("phone").value.trim();
 
     if (!/^\+?\d{8,15}$/.test(phone)) {
-        document.getElementById("result").innerText =
-            "❌ Ugyldig telefonnummer";
+        document.getElementById("result").innerText = "❌ Ugyldig telefonnummer";
         return;
     }
 
@@ -283,46 +285,39 @@ document.getElementById("bookingForm")
     const addon = servicesCache.find(s => s.id === addonSelect.value);
 
     if (!main) {
-        document.getElementById("result").innerText =
-            "❌ Velg behandling";
+        document.getElementById("result").innerText = "❌ Velg behandling";
         return;
     }
 
     const payload = {
-        name: name,
-        phone: phone,
-        service: mainSelect.value,
-        addon: addon ? addon.id : null,
-        total_price: (main?.price || 0) + (addon?.price || 0),
-        date: date,
-        start_time: start,
-        end_time: end,
-        token: token
+        name:name,
+        phone:phone,
+        service:main.id,
+        addon:addon?addon.id:null,
+        total_price:(main?.price||0)+(addon?.price||0),
+        date:date,
+        start_time:start,
+        end_time:end,
+        token:token
     };
 
     try {
-        const res = await fetch(
-            "https://lashby-backend.onrender.com/bookings",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }
-        );
+        const res = await fetch("/bookings", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(payload)
+        });
 
         const data = await res.json();
 
         if (res.ok) {
-            document.getElementById("result").innerText =
-                "✅ Booking bekreftet";
+            document.getElementById("result").innerText = "✅ Booking bekreftet";
             button.disabled = true;
         } else {
-            document.getElementById("result").innerText =
-                "❌ " + (data.detail || "Feil");
+            document.getElementById("result").innerText = "❌ " + (data.detail || "Feil");
         }
     } catch {
-        document.getElementById("result").innerText =
-            "❌ Serverfeil";
+        document.getElementById("result").innerText = "❌ Serverfeil";
     }
 });
     </script>
