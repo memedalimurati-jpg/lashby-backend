@@ -39,6 +39,25 @@ if not TOKENS_FILE.exists():
     TOKENS_FILE.write_text("{}", encoding="utf-8")
 
 # ────────────────────────────────────
+# Model
+# ────────────────────────────────────
+class Booking(BaseModel):
+    name: str
+    phone: str
+    service: str
+    addon: str | None = None
+    total_price: int
+    date: str
+    start_time: str
+    end_time: str
+    token: str
+
+# ────────────────────────────────────
+# Static mount
+# ────────────────────────────────────
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# ────────────────────────────────────
 # Helpers
 # ────────────────────────────────────
 def load_json(path: Path, default):
@@ -57,34 +76,15 @@ def booking_exists(date, start, end):
     bookings = load_json(BOOKINGS_FILE, [])
     for b in bookings:
         if (
-            b.get("date") == date and
-            b.get("start_time") == start and
-            b.get("end_time") == end
+            b.get("date") == date
+            and b.get("start_time") == start
+            and b.get("end_time") == end
         ):
             return True
     return False
 
 # ────────────────────────────────────
-# Models
-# ────────────────────────────────────
-class Booking(BaseModel):
-    name: str
-    phone: str
-    service: str
-    addon: str | None = None
-    total_price: int
-    date: str
-    start_time: str
-    end_time: str
-    token: str
-
-# ────────────────────────────────────
-# Static
-# ────────────────────────────────────
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-# ────────────────────────────────────
-# Root
+# ROOT
 # ────────────────────────────────────
 @app.get("/")
 def root():
@@ -101,7 +101,7 @@ def booking_page():
     return file.read_text(encoding="utf-8")
 
 # ────────────────────────────────────
-# Services
+# SERVICES
 # ────────────────────────────────────
 @app.get("/services")
 def services():
@@ -146,8 +146,6 @@ def services():
 # ────────────────────────────────────
 # TOKENS
 # ────────────────────────────────────
-
-# 1️⃣ Desktop registrerer token
 @app.post("/tokens/{token}")
 def register_token(token: str):
     tokens = load_json(TOKENS_FILE, {})
@@ -155,44 +153,56 @@ def register_token(token: str):
     save_json(TOKENS_FILE, tokens)
     return {"ok": True}
 
-# 2️⃣ Booking-side validerer token
 @app.get("/tokens/{token}")
-def validate_token(token: str):
+def check_token(token: str):
     tokens = load_json(TOKENS_FILE, {})
-
     if token not in tokens:
-        raise HTTPException(404, "Ugyldig link")
-
-    if tokens[token] == "used":
-        raise HTTPException(400, "Link allerede brukt")
-
-    return {"status": "valid"}
+        raise HTTPException(400, "Ugyldig link")
+    return {"status": tokens[token]}
 
 # ────────────────────────────────────
-# Create booking
+# GET ALL BOOKINGS  🔥 VIKTIG
+# ────────────────────────────────────
+@app.get("/bookings")
+def get_bookings():
+    return load_json(BOOKINGS_FILE, [])
+
+# ────────────────────────────────────
+# CREATE BOOKING
 # ────────────────────────────────────
 @app.post("/bookings")
 def create_booking(b: Booking):
 
     tokens = load_json(TOKENS_FILE, {})
 
-    # 🔐 token må eksistere
     if b.token not in tokens:
         raise HTTPException(400, "Ugyldig link")
 
-    # 🔐 token må være free
-    if tokens[b.token] != "free":
+    if tokens[b.token] == "used":
         raise HTTPException(400, "Link allerede brukt")
 
-    # 🔐 sjekk om tid allerede booket
     if booking_exists(b.date, b.start_time, b.end_time):
         raise HTTPException(400, "Tiden er allerede booket")
 
+    # Valider telefon
+    if not b.phone.isdigit() or not (8 <= len(b.phone) <= 15):
+        raise HTTPException(400, "Ugyldig telefonnummer")
+
     bookings = load_json(BOOKINGS_FILE, [])
-    bookings.append(b.dict())
+
+    bookings.append({
+        "name": b.name,
+        "phone": b.phone,
+        "service": b.service,
+        "addon": b.addon,
+        "total_price": b.total_price,
+        "date": b.date,
+        "start_time": b.start_time,
+        "end_time": b.end_time
+    })
+
     save_json(BOOKINGS_FILE, bookings)
 
-    # 🔒 merk token som brukt
     tokens[b.token] = "used"
     save_json(TOKENS_FILE, tokens)
 
