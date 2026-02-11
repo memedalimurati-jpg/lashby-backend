@@ -88,7 +88,9 @@ def booking_exists(date, start, end):
 # ────────────────────────────────────
 @app.get("/services")
 def services():
-    return {"path": str(OFFERS_FILE)}
+    snapshot = load_json(OFFERS_FILE, {})
+    return snapshot
+
 
 @app.get("/booking", response_class=HTMLResponse)
 def booking_page(request: Request):
