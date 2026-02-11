@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException
+﻿from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -52,12 +52,10 @@ class Booking(BaseModel):
     end_time: str
     token: str
 
-
 # ────────────────────────────────────
 # Static
 # ────────────────────────────────────
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
 
 # ────────────────────────────────────
 # Helpers
@@ -68,13 +66,11 @@ def load_json(path: Path, default):
     except Exception:
         return default
 
-
 def save_json(path: Path, data):
     path.write_text(
         json.dumps(data, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
-
 
 def booking_exists(date, start, end):
     bookings = load_json(BOOKINGS_FILE, [])
@@ -87,7 +83,6 @@ def booking_exists(date, start, end):
             return True
     return False
 
-
 # ────────────────────────────────────
 # Routes
 # ────────────────────────────────────
@@ -95,12 +90,28 @@ def booking_exists(date, start, end):
 def root():
     return {"status": "ok", "message": "Lashby backend kjører"}
 
-
+# ✅ VALIDER TOKEN NÅR BOOKING-SIDEN ÅPNES
 @app.get("/booking", response_class=HTMLResponse)
-def booking_page():
+def booking_page(request: Request):
+
+    token = request.query_params.get("token")
+
+    if not token:
+        raise HTTPException(400, "Mangler token")
+
+    tokens = load_json(TOKENS_FILE, {})
+
+    if token not in tokens:
+        raise HTTPException(400, "Ugyldig eller brukt link")
+
+    if tokens[token] == "used":
+        raise HTTPException(400, "Ugyldig eller brukt link")
+
     file = STATIC_DIR / "booking.html"
+
     if not file.exists():
         raise HTTPException(404, "booking.html ikke funnet")
+
     return file.read_text(encoding="utf-8")
 
 
@@ -140,7 +151,6 @@ def services():
 
     return result
 
-
 # ────────────────────────────────────
 # Tokens
 # ────────────────────────────────────
@@ -150,7 +160,6 @@ def register_token(token: str):
     tokens[token] = "free"
     save_json(TOKENS_FILE, tokens)
     return {"ok": True}
-
 
 # ────────────────────────────────────
 # Booking
@@ -172,7 +181,6 @@ def create_booking(b: Booking):
     bookings = load_json(BOOKINGS_FILE, [])
     snapshot = load_json(OFFERS_FILE, {})
 
-    # 🔍 Finn service navn
     service_name = ""
     addon_name = None
 
