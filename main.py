@@ -105,7 +105,7 @@ def create_booking(b: Booking):
             "status": "booked",
             "name": b.name,
             "phone": b.phone,
-            "treatment": b.service
+            "service": b.service
         })
         .eq("id", b.token)
         .eq("status", "available")
