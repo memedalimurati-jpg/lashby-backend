@@ -87,7 +87,7 @@
         <input type="text" id="phone" required>
 
         <label>Behandling</label>
-        <select id="serviceSelect">
+        <select id="serviceSelect" required>
             <option value="">Velg behandling</option>
             <option value="Classic">Classic</option>
             <option value="Volume">Volume</option>
@@ -106,66 +106,64 @@
     </form>
 
     <script>
-const params = new URLSearchParams(window.location.search);
-const date  = params.get("date");
-const start = params.get("start");
-const token = params.get("token");
+        const params = new URLSearchParams(window.location.search);
+        const date  = params.get("date");
+        const start = params.get("start");
 
-const info = document.getElementById("info");
-const result = document.getElementById("result");
+        const info = document.getElementById("info");
+        const result = document.getElementById("result");
 
-if (!date || !start || !token) {
-    info.innerHTML = "❌ Ugyldig link";
-    info.style.color = "red";
-} else {
-    document.getElementById("date").value = date;
-    document.getElementById("time").value = start;
-    info.innerHTML = `📅 ${date} ⏰ ${start}`;
-}
-
-document.getElementById("bookingForm").addEventListener("submit", async function(e) {
-    e.preventDefault();
-
-    const name = document.getElementById("name").value.trim();
-    const phone = document.getElementById("phone").value.trim();
-    const service = document.getElementById("serviceSelect").value;
-
-    if (!service) {
-        result.innerText = "❌ Velg behandling";
-        return;
-    }
-
-    const payload = {
-        name: name,
-        phone: phone,
-        service: service,
-        addon: null,
-        total_price: 0,
-        date: date,
-        start_time: start,
-        end_time: "",
-        token: token
-    };
-
-    try {
-        const res = await fetch("/bookings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-            result.innerText = "✅ Booking bekreftet!";
+        if (!date || !start) {
+            info.innerHTML = "❌ Ugyldig link";
+            info.style.color = "red";
         } else {
-            result.innerText = "❌ " + (data.detail || "Feil");
+            document.getElementById("date").value = date;
+            document.getElementById("time").value = start;
+            info.innerHTML = `📅 ${date} ⏰ ${start}`;
         }
 
-    } catch (err) {
-        result.innerText = "❌ Serverfeil";
-    }
-});
+        document.getElementById("bookingForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+
+            const name = document.getElementById("name").value.trim();
+            const phone = document.getElementById("phone").value.trim();
+            const service = document.getElementById("serviceSelect").value;
+
+            if (!service) {
+                result.innerText = "❌ Velg behandling";
+                return;
+            }
+
+            const payload = {
+                name: name,
+                phone: phone,
+                service: service,
+                addon: null,
+                total_price: 0,
+                date: date,
+                start_time: start,
+                end_time: ""
+            };
+
+            try {
+                const res = await fetch("/bookings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    result.innerText = "✅ Booking bekreftet!";
+                } else {
+                    result.innerText = "❌ " + (data.detail || "Feil");
+                }
+
+            } catch (err) {
+                result.innerText = "❌ Serverfeil";
+            }
+        });
     </script>
 
 </body>

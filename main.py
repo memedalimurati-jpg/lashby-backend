@@ -1,11 +1,10 @@
-﻿import os
+﻿import json
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from pathlib import Path
-from supabase import create_client
 
 # --------------------------------------------------
 # APP
@@ -21,28 +20,17 @@ app.add_middleware(
 )
 
 # --------------------------------------------------
-# SUPABASE
-# --------------------------------------------------
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise Exception("Supabase environment variables missing")
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# --------------------------------------------------
 # PATHS
 # --------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+DATA_FILE = BASE_DIR / "data" / "bookings.json"
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --------------------------------------------------
-# MODELS
+# MODEL
 # --------------------------------------------------
 
 class Booking(BaseModel):
@@ -54,7 +42,20 @@ class Booking(BaseModel):
     date: str
     start_time: str
     end_time: str | None = ""
-    token: str
+
+# --------------------------------------------------
+# HELPERS
+# --------------------------------------------------
+
+def load_bookings():
+    if not DATA_FILE.exists():
+        return []
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_bookings(bookings):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(bookings, f, indent=2)
 
 # --------------------------------------------------
 # ROUTES
@@ -71,49 +72,36 @@ def booking_page():
         raise HTTPException(404, "booking.html not found")
     return file.read_text(encoding="utf-8")
 
+@app.get("/bookings")
+def get_bookings():
+    return load_bookings()
+
 # --------------------------------------------------
-# BOOKING
+# CREATE BOOKING
 # --------------------------------------------------
 
 @app.post("/bookings")
 def create_booking(b: Booking):
 
-    print("BOOKING RECEIVED:", b)
+    bookings = load_bookings()
 
-    token = b.token.strip()
+    # 🔥 Sjekk om tiden allerede er brukt
+    for existing in bookings:
+        if existing["date"] == b.date and existing["start_time"] == b.start_time:
+            raise HTTPException(400, "Timen er allerede booket")
 
-    # 1️⃣ Finn slot
-    slot_response = (
-        supabase
-        .table("slots")
-        .select("*")
-        .eq("id", token)
-        .execute()
-    )
+    new_booking = {
+        "name": b.name,
+        "phone": b.phone,
+        "service": b.service,
+        "addon": b.addon,
+        "total_price": b.total_price,
+        "date": b.date,
+        "start_time": b.start_time,
+        "end_time": b.end_time
+    }
 
-    if not slot_response.data:
-        raise HTTPException(400, "Link ugyldig")
-
-    slot = slot_response.data[0]
-
-    if slot["status"] != "available":
-        raise HTTPException(400, "Link allerede brukt eller ugyldig")
-
-    # 2️⃣ Oppdater slot
-    update_response = (
-        supabase
-        .table("slots")
-        .update({
-            "status": "booked",
-            "name": b.name,
-            "phone": b.phone,
-            "service": b.service
-        })
-        .eq("id", token)
-        .execute()
-    )
-
-    if not update_response.data:
-        raise HTTPException(500, "Kunne ikke oppdatere booking")
+    bookings.append(new_booking)
+    save_bookings(bookings)
 
     return {"success": True}
