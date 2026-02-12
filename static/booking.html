@@ -205,17 +205,6 @@ if (!date || !start || !end || !token) {
 }
 
 /* TOKEN VALIDATION */
-async function validateToken() {
-    try {
-        const res = await fetch(`/tokens/${token}`);
-        if (!res.ok) throw new Error();
-    } catch {
-        info.innerHTML = "❌ Ugyldig eller brukt link";
-        info.style.color = "red";
-        button.disabled = true;
-    }
-}
-if (token) validateToken();
 
 /* LOAD SERVICES */
 async function loadServices() {

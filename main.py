@@ -4,8 +4,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
-import json
-import uuid
+from supabase import create_client
+import os
 
 # --------------------------------------------------
 # APP
@@ -20,7 +20,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print("I AM THE REAL MAIN FILE")
+print("SUPABASE BACKEND STARTED")
+
+# --------------------------------------------------
+# SUPABASE CONFIG
+# --------------------------------------------------
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
 # --------------------------------------------------
 # PATHS
@@ -28,20 +38,9 @@ print("I AM THE REAL MAIN FILE")
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-DATA_DIR = BASE_DIR / "data"
-
 STATIC_DIR.mkdir(exist_ok=True)
-DATA_DIR.mkdir(exist_ok=True)
 
-OFFERS_FILE = STATIC_DIR / "offers_snapshot.json"
-BOOKINGS_FILE = DATA_DIR / "bookings.json"
-TOKENS_FILE = DATA_DIR / "tokens.json"
-
-if not BOOKINGS_FILE.exists():
-    BOOKINGS_FILE.write_text("[]", encoding="utf-8")
-
-if not TOKENS_FILE.exists():
-    TOKENS_FILE.write_text("{}", encoding="utf-8")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --------------------------------------------------
 # MODELS
@@ -56,29 +55,7 @@ class Booking(BaseModel):
     date: str
     start_time: str
     end_time: str
-    token: str
-
-# --------------------------------------------------
-# STATIC
-# --------------------------------------------------
-
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-# --------------------------------------------------
-# HELPERS
-# --------------------------------------------------
-
-def load_json(path: Path, default):
-    try:
-        return json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception as e:
-        print("JSON ERROR:", e)
-        return default
-def save_json(path: Path, data):
-    path.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
+    token: str  # dette er slot_id
 
 # --------------------------------------------------
 # ROUTES
@@ -86,7 +63,7 @@ def save_json(path: Path, data):
 
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "Lashby backend kjører"}
+    return {"status": "ok", "message": "Lashby backend med Supabase kjører"}
 
 
 @app.get("/booking", response_class=HTMLResponse)
@@ -99,45 +76,19 @@ def booking_page():
 
 @app.get("/services")
 def services():
-    snapshot = load_json(OFFERS_FILE, {})
-    return snapshot
+    # Hvis du fortsatt bruker offers_snapshot.json kan du beholde dette
+    # Eller returnere tom hvis du vil hardkode i HTML
+    return {"services": [], "packages": [], "addons": []}
 
 
 @app.get("/bookings")
 def get_bookings():
-    data = load_json(BOOKINGS_FILE, [])
-    print("RETURNING BOOKINGS:", data)
-    return data
+    response = supabase.table("slots").select("*").execute()
+    return response.data
 
 
 # --------------------------------------------------
-# TOKEN
-# --------------------------------------------------
-
-@app.post("/tokens/{token}")
-def register_token(token: str):
-    tokens = load_json(TOKENS_FILE, {})
-    tokens[token] = "free"
-    save_json(TOKENS_FILE, tokens)
-    print("TOKEN REGISTERED:", token)
-    return {"ok": True}
-
-
-@app.get("/tokens/{token}")
-def validate_token(token: str):
-    tokens = load_json(TOKENS_FILE, {})
-
-    if token not in tokens:
-        raise HTTPException(400, "Ugyldig eller brukt link")
-
-    if tokens[token] == "used":
-        raise HTTPException(400, "Ugyldig eller brukt link")
-
-    return {"valid": True}
-
-
-# --------------------------------------------------
-# BOOKING
+# BOOKING (FØRSTE I MØLLA)
 # --------------------------------------------------
 
 @app.post("/bookings")
@@ -145,35 +96,23 @@ def create_booking(b: Booking):
 
     print("BOOKING RECEIVED:", b)
 
-    tokens = load_json(TOKENS_FILE, {})
+    # Første i mølla:
+    # Oppdater kun hvis status = available
+    response = (
+        supabase
+        .table("slots")
+        .update({
+            "status": "booked",
+            "name": b.name,
+            "phone": b.phone,
+            "treatment": b.service
+        })
+        .eq("id", b.token)
+        .eq("status", "available")
+        .execute()
+    )
 
-    if b.token not in tokens:
-        raise HTTPException(400, "Ugyldig link")
-
-    if tokens[b.token] == "used":
-        raise HTTPException(400, "Link allerede brukt")
-
-    bookings = load_json(BOOKINGS_FILE, [])
-
-    new_booking = {
-        "id": str(uuid.uuid4()),
-        "name": b.name,
-        "phone": b.phone,
-        "service": b.service,
-        "addon": b.addon,
-        "total_price": b.total_price,
-        "date": b.date.strip(),
-        "start_time": b.start_time,
-        "end_time": b.end_time
-    }
-
-    bookings.append(new_booking)
-
-    print("SAVING TO:", BOOKINGS_FILE)
-    save_json(BOOKINGS_FILE, bookings)
-    print("BOOKING SAVED")
-
-    tokens[b.token] = "used"
-    save_json(TOKENS_FILE, tokens)
+    if not response.data:
+        raise HTTPException(400, "Link allerede brukt eller ugyldig")
 
     return {"success": True}
