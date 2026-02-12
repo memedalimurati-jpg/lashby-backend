@@ -1,124 +1,172 @@
-﻿<script>
+﻿<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <title>Bekreft timen din – Lashby Emira</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3c6d0;
+            padding: 40px;
+            color: #111;
+        }
+
+        form {
+            background: #fdecef;
+            padding: 28px;
+            max-width: 480px;
+            margin: auto;
+            border-radius: 18px;
+            box-shadow: 0 8px 26px rgba(0,0,0,0.18);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        #info {
+            text-align: center;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 11px;
+            margin-top: 6px;
+            font-size: 14px;
+            border-radius: 10px;
+            border: 1px solid #d9a4af;
+            background: #fff;
+            box-sizing: border-box;
+        }
+
+            input[readonly] {
+                background: #f0d6db;
+            }
+
+        button {
+            margin-top: 24px;
+            background: #e07b91;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 14px;
+            font-size: 15px;
+            padding: 14px;
+            width: 100%;
+        }
+
+        #result {
+            margin-top: 16px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <form id="bookingForm">
+
+        <h2>Bekreft timen din</h2>
+        <div id="info"></div>
+
+        <label>Navn</label>
+        <input type="text" id="name" required>
+
+        <label>Telefon</label>
+        <input type="text" id="phone" required>
+
+        <label>Behandling</label>
+        <select id="serviceSelect">
+            <option value="">Velg behandling</option>
+            <option value="Classic">Classic</option>
+            <option value="Volume">Volume</option>
+            <option value="Hybrid">Hybrid</option>
+        </select>
+
+        <label>Dato</label>
+        <input type="text" id="date" readonly>
+
+        <label>Tid</label>
+        <input type="text" id="time" readonly>
+
+        <button type="submit">Bekreft booking</button>
+        <div id="result"></div>
+
+    </form>
+
+    <script>
 const params = new URLSearchParams(window.location.search);
 const date  = params.get("date");
 const start = params.get("start");
-const end   = params.get("end");
 const token = params.get("token");
 
-const info   = document.getElementById("info");
-const button = document.querySelector("button");
-const price  = document.getElementById("price");
-const mainSelect  = document.getElementById("mainService");
-const addonSelect = document.getElementById("addonService");
+const info = document.getElementById("info");
+const result = document.getElementById("result");
 
-let servicesCache = [];
-
-/* Hvis mangler parametre */
-if (!date || !start || !end || !token) {
-    info.innerHTML = "❌ Denne booking-linken er ugyldig";
+if (!date || !start || !token) {
+    info.innerHTML = "❌ Ugyldig link";
     info.style.color = "red";
-    button.disabled = true;
 } else {
-    document.getElementById("date").value  = date;
-    document.getElementById("start").value = start;
-    document.getElementById("end").value   = end;
-    info.innerHTML = `📅 ${date} ⏰ ${start} – ${end}`;
+    document.getElementById("date").value = date;
+    document.getElementById("time").value = start;
+    info.innerHTML = `📅 ${date} ⏰ ${start}`;
 }
 
-/* LOAD SERVICES */
-async function loadServices() {
-    try {
-        const res = await fetch("/services");
-        const data = await res.json();
-
-        servicesCache = [];
-
-        data.services?.forEach(s => {
-            servicesCache.push({id:s.id,name:s.name,price:s.price});
-        });
-
-        data.packages?.forEach(p => {
-            servicesCache.push({id:p.id,name:p.name,price:p.price});
-        });
-
-        data.addons?.forEach(a => {
-            servicesCache.push({id:a.id,name:a.name,price:a.price});
-        });
-
-        servicesCache.forEach(s => {
-            const o = document.createElement("option");
-            o.value = s.id;
-            o.textContent = `${s.name} (${s.price} kr)`;
-            mainSelect.appendChild(o);
-        });
-
-    } catch {
-        info.innerHTML = "❌ Klarte ikke å laste behandlinger";
-        info.style.color = "red";
-    }
-}
-loadServices();
-
-/* PRICE UPDATE */
-function oppdaterPris() {
-    let total = 0;
-    const main  = servicesCache.find(s => s.id === mainSelect.value);
-
-    if (main) total += main.price;
-
-    price.textContent = `Totalpris: ${total} kr`;
-    button.disabled = !main;
-}
-mainSelect.addEventListener("change", oppdaterPris);
-
-/* SUBMIT */
-document.getElementById("bookingForm").addEventListener("submit", async e => {
+document.getElementById("bookingForm").addEventListener("submit", async function(e) {
     e.preventDefault();
 
-    const name  = document.getElementById("name").value.trim();
+    const name = document.getElementById("name").value.trim();
     const phone = document.getElementById("phone").value.trim();
+    const service = document.getElementById("serviceSelect").value;
 
-    if (!/^\+?\d{8,15}$/.test(phone)) {
-        document.getElementById("result").innerText = "❌ Ugyldig telefonnummer";
-        return;
-    }
-
-    const main  = servicesCache.find(s => s.id === mainSelect.value);
-
-    if (!main) {
-        document.getElementById("result").innerText = "❌ Velg behandling";
+    if (!service) {
+        result.innerText = "❌ Velg behandling";
         return;
     }
 
     const payload = {
-        name:name,
-        phone:phone,
-        service:main.id,
-        addon:null,
-        total_price:main.price,
-        date:date,
-        start_time:start,
-        end_time:end,
-        token:token
+        name: name,
+        phone: phone,
+        service: service,
+        addon: null,
+        total_price: 0,
+        date: date,
+        start_time: start,
+        end_time: "",
+        token: token
     };
 
     try {
         const res = await fetch("/bookings", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify(payload)
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
         });
 
         const data = await res.json();
 
         if (res.ok) {
-            document.getElementById("result").innerText = "✅ Booking bekreftet";
-            button.disabled = true;
+            result.innerText = "✅ Booking bekreftet!";
         } else {
-            document.getElementById("result").innerText = "❌ " + (data.detail || "Feil");
+            result.innerText = "❌ " + (data.detail || "Feil");
         }
-    } catch {
-        document.getElementById("result").innerText = "❌ Serverfeil";
+
+    } catch (err) {
+        result.innerText = "❌ Serverfeil";
     }
 });
-</script>
+    </script>
+
+</body>
+</html>
