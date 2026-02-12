@@ -256,8 +256,8 @@ document.getElementById("bookingForm").addEventListener("submit", async e => {
     const payload = {
         name: document.getElementById("name").value,
         phone: document.getElementById("phone").value,
-        service: mainSelect.value,
-        addon: addon ? addon.id : null,
+        service: main ? main.name : "",
+        addon: addon ? addon.name : null,
         total_price: (main?.price || 0) + (addon?.price || 0),
         date: date,
         start_time: start,
