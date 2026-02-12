@@ -1,184 +1,4 @@
-﻿<!DOCTYPE html>
-<html lang="no">
-<head>
-    <meta charset="UTF-8">
-    <title>Bekreft timen din – Lashby Emira</title>
-
-    <style>
-        body {
-            font-family: Arial,sans-serif;
-            background: #f3c6d0;
-            padding: 40px;
-            color: #111;
-        }
-
-        form {
-            background: #fdecef;
-            padding: 28px;
-            max-width: 480px;
-            margin: auto;
-            border-radius: 18px;
-            box-shadow: 0 8px 26px rgba(0,0,0,0.18);
-        }
-
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-            .header img {
-                height: 46px;
-            }
-
-        .header-title {
-            font-size: 18px;
-            font-weight: bold;
-            text-align: center;
-        }
-
-        .header-sub {
-            font-size: 12px;
-            color: #666;
-        }
-
-        h2 {
-            text-align: center;
-            margin-bottom: 10px;
-        }
-
-        #info {
-            text-align: center;
-            margin-bottom: 16px;
-            font-size: 14px;
-        }
-
-        label {
-            display: block;
-            margin-top: 14px;
-            font-weight: bold;
-        }
-
-        input, select {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 11px;
-            margin-top: 6px;
-            font-size: 14px;
-            border-radius: 10px;
-            border: 1px solid #d9a4af;
-            background: #fff;
-        }
-
-            input[readonly] {
-                background: #f0d6db;
-            }
-
-        .row {
-            display: flex;
-            gap: 12px;
-        }
-
-        .field {
-            flex: 1;
-        }
-
-        .datetime-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 6px;
-        }
-
-            .datetime-row input {
-                flex: 1;
-                text-align: center;
-            }
-
-        #price {
-            margin-top: 14px;
-            font-size: 15px;
-            text-align: right;
-            font-weight: bold;
-        }
-
-        button {
-            margin-top: 24px;
-            background: #e07b91;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 14px;
-            font-size: 15px;
-            padding: 14px;
-            width: 100%;
-        }
-
-            button:disabled {
-                background: #cfa0aa;
-                cursor: not-allowed;
-            }
-
-        #result {
-            margin-top: 16px;
-            text-align: center;
-            font-weight: bold;
-        }
-    </style>
-</head>
-
-<body>
-
-    <form id="bookingForm">
-
-        <div class="header">
-            <img src="logo.png" onerror="this.onerror=null;this.src='/static/logo.png';">
-            <div class="header-title">
-                Lashby Emira<br>
-                <span class="header-sub">siden 2014</span>
-            </div>
-        </div>
-
-        <h2>Bekreft timen din</h2>
-        <div id="info"></div>
-
-        <div class="row">
-            <div class="field">
-                <label>Navn</label>
-                <input type="text" id="name" required>
-            </div>
-            <div class="field">
-                <label>Telefon</label>
-                <input type="text" id="phone" required>
-            </div>
-        </div>
-
-        <label>Behandling / Pakke</label>
-        <select id="mainService">
-            <option value="">Ingen behandlinger</option>
-        </select>
-
-        <label>Tillegg (valgfritt)</label>
-        <select id="addonService">
-            <option value="">Ingen tillegg</option>
-        </select>
-
-        <div id="price">Totalpris: 0 kr</div>
-
-        <label>Dato / Tid</label>
-        <div class="datetime-row">
-            <input type="text" id="date" readonly>
-            <input type="text" id="start" readonly>
-            <input type="text" id="end" readonly>
-        </div>
-
-        <button type="submit" disabled>Bekreft booking</button>
-        <div id="result"></div>
-
-    </form>
-
-    <script>
+﻿<script>
 const params = new URLSearchParams(window.location.search);
 const date  = params.get("date");
 const start = params.get("start");
@@ -193,6 +13,7 @@ const addonSelect = document.getElementById("addonService");
 
 let servicesCache = [];
 
+/* Hvis mangler parametre */
 if (!date || !start || !end || !token) {
     info.innerHTML = "❌ Denne booking-linken er ugyldig";
     info.style.color = "red";
@@ -204,8 +25,6 @@ if (!date || !start || !end || !token) {
     info.innerHTML = `📅 ${date} ⏰ ${start} – ${end}`;
 }
 
-/* TOKEN VALIDATION */
-
 /* LOAD SERVICES */
 async function loadServices() {
     try {
@@ -214,26 +33,23 @@ async function loadServices() {
 
         servicesCache = [];
 
-        data.services.forEach(s => {
-            servicesCache.push({id:s.id,name:s.name,price:s.price,category:"Behandling"});
+        data.services?.forEach(s => {
+            servicesCache.push({id:s.id,name:s.name,price:s.price});
         });
 
-        data.packages.forEach(p => {
-            servicesCache.push({id:p.id,name:p.name,price:p.price,category:"Pakke"});
+        data.packages?.forEach(p => {
+            servicesCache.push({id:p.id,name:p.name,price:p.price});
         });
 
-        data.addons.forEach(a => {
-            servicesCache.push({id:a.id,name:a.name,price:a.price,category:"Tillegg"});
+        data.addons?.forEach(a => {
+            servicesCache.push({id:a.id,name:a.name,price:a.price});
         });
 
         servicesCache.forEach(s => {
             const o = document.createElement("option");
             o.value = s.id;
             o.textContent = `${s.name} (${s.price} kr)`;
-            if (s.category === "Tillegg")
-                addonSelect.appendChild(o);
-            else
-                mainSelect.appendChild(o);
+            mainSelect.appendChild(o);
         });
 
     } catch {
@@ -247,16 +63,13 @@ loadServices();
 function oppdaterPris() {
     let total = 0;
     const main  = servicesCache.find(s => s.id === mainSelect.value);
-    const addon = servicesCache.find(s => s.id === addonSelect.value);
 
     if (main) total += main.price;
-    if (addon) total += addon.price;
 
     price.textContent = `Totalpris: ${total} kr`;
     button.disabled = !main;
 }
 mainSelect.addEventListener("change", oppdaterPris);
-addonSelect.addEventListener("change", oppdaterPris);
 
 /* SUBMIT */
 document.getElementById("bookingForm").addEventListener("submit", async e => {
@@ -271,7 +84,6 @@ document.getElementById("bookingForm").addEventListener("submit", async e => {
     }
 
     const main  = servicesCache.find(s => s.id === mainSelect.value);
-    const addon = servicesCache.find(s => s.id === addonSelect.value);
 
     if (!main) {
         document.getElementById("result").innerText = "❌ Velg behandling";
@@ -282,8 +94,8 @@ document.getElementById("bookingForm").addEventListener("submit", async e => {
         name:name,
         phone:phone,
         service:main.id,
-        addon:addon?addon.id:null,
-        total_price:(main?.price||0)+(addon?.price||0),
+        addon:null,
+        total_price:main.price,
         date:date,
         start_time:start,
         end_time:end,
@@ -309,7 +121,4 @@ document.getElementById("bookingForm").addEventListener("submit", async e => {
         document.getElementById("result").innerText = "❌ Serverfeil";
     }
 });
-    </script>
-
-</body>
-</html>
+</script>
