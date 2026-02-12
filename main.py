@@ -1,4 +1,4 @@
-﻿###main.py ##
+﻿## main.py ##
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -87,6 +87,7 @@ def booking_exists(date, start, end):
 # ────────────────────────────────────
 # Routes
 # ────────────────────────────────────
+
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Lashby backend kjører"}
@@ -99,7 +100,7 @@ def booking_page():
     return file.read_text(encoding="utf-8")
 
 # ────────────────────────────────────
-# SERVICES (ENDLIG, ROBUST)
+# SERVICES
 # ────────────────────────────────────
 @app.get("/services")
 def services():
@@ -112,6 +113,7 @@ def services():
             "error": "Failed to parse offers_snapshot.json",
             "details": str(e)
         }
+
     result = []
 
     for s in snapshot.get("services", []):
@@ -153,6 +155,12 @@ def register_token(token: str):
 # ────────────────────────────────────
 # Booking
 # ────────────────────────────────────
+
+# ✅ DETTE MANGLET – derfor fikk du 405
+@app.get("/bookings")
+def get_bookings():
+    return load_json(BOOKINGS_FILE, [])
+
 @app.post("/bookings")
 def create_booking(b: Booking):
     tokens = load_json(TOKENS_FILE, {})

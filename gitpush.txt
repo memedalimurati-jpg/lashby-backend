@@ -1,0 +1,3 @@
+git add .
+git commit -m "Remove Supabase and switch to JSON booking system"
+git push
